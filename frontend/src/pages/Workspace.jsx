@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import WorkspaceHeader from '../components/WorkspaceHeader';
 import WorkspaceSidebar from '../components/WorkspaceSidebar';
 import Whiteboard from '../components/Whiteboard';
@@ -9,6 +9,7 @@ import UsersPanel from '../components/UsersPanel';
 import HistoryPanel from '../components/HistoryTemp';
 import SettingsPanel from '../components/SettingsPanel';
 import { clearWorkspaceHistory, getWorkspaceHistory, getWorkspacePreferences, getWorkspaceStore, saveWorkspace, saveWorkspaceHistory, saveWorkspacePreferences } from '../data/workspaceStore';
+import { isInterviewWorkspace } from '../types/workspace';
 import './Workspace.css';
 export const WorkspacePage = () => {
     const { id = 'workspace' } = useParams();
@@ -72,5 +73,8 @@ export const WorkspacePage = () => {
         saveWorkspacePreferences(workspaceId, { splitRatio: value });
     };
     const showingManagementPanel = ['users', 'history', 'settings'].includes(safeActiveTab);
+    if (workspace && isInterviewWorkspace(workspace)) {
+        return _jsx(Navigate, { to: `/interview/${id}`, replace: true });
+    }
     return (_jsxs("div", { className: "workspace", "data-active-tab": safeActiveTab, children: [_jsx(WorkspaceHeader, { roomId: id, workspaceName: currentWorkspace.name, workspaceType: workspaceType, onLeave: () => navigate('/dashboard') }), _jsxs("div", { className: "workspace-body", children: [_jsx(WorkspaceSidebar, { activeTab: safeActiveTab, setActiveTab: setActiveTab, visibleTabs: visibleTabs }), _jsxs("main", { className: `workspace-main ${showingManagementPanel ? 'workspace-main-single' : ''}`, style: { gridTemplateColumns: showingManagementPanel || !hasBothTools ? '1fr' : `${splitRatio}fr ${100 - splitRatio}fr` }, children: [safeActiveTab === 'users' && _jsx(UsersPanel, { workspace: currentWorkspace, onAddUser: handleAddUser }), safeActiveTab === 'history' && _jsx(HistoryPanel, { entries: historyEntries, onClear: () => { clearWorkspaceHistory(workspaceId); setHistoryEntries([]); } }), safeActiveTab === 'settings' && _jsx(SettingsPanel, { splitRatio: splitRatio, hasBothTools: hasBothTools, onSplitRatioChange: handleSplitRatioChange, onDownload: handleDownload }), !showingManagementPanel && hasWhiteboard && (_jsxs("section", { className: "whiteboard-panel", "data-panel": "whiteboard", children: [_jsxs("div", { className: "panel-title", children: ["Whiteboard ", _jsx("span", { children: "Visual workspace" })] }), _jsx(Whiteboard, { workspaceId: workspaceId, onActivity: recordActivity })] })), !showingManagementPanel && hasCodeEditor && (_jsxs("section", { className: "code-panel", "data-panel": "code", children: [_jsxs("div", { className: "panel-title", children: ["Code Editor ", _jsx("span", { children: "Project files" })] }), _jsx(CodeEditor, { workspaceId: workspaceId, onActivity: recordActivity })] }))] })] })] }));
 };

@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
+import { setCurrentUserName } from "../data/currentUser";
 import "./Register.css";
 
 function Register() {
@@ -6,7 +7,10 @@ function Register() {
 
   const handleRegister = (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
+    const fullName = form.querySelector('input[type="text"]')?.value || "";
     window.localStorage.setItem("syncspace-authenticated", "true");
+    setCurrentUserName(fullName || "You");
     navigate("/dashboard", { replace: true });
   };
 

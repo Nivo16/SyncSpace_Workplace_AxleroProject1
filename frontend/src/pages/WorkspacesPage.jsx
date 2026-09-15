@@ -7,8 +7,11 @@ import { initialWorkspaces } from '../data/mockData';
 import { Button } from '../components/ui/Button';
 import { Plus, Zap } from 'lucide-react';
 import { getWorkspaceStore, saveWorkspace } from '../data/workspaceStore';
+import { getWorkspacePath } from '../types/workspace';
 import { EditWorkspaceModal } from '../components/modals/EditWorkspaceModal';
+import { useNavigate } from 'react-router-dom';
 export const WorkspacesPage = () => {
+    const navigate = useNavigate();
     const [workspaces, setWorkspaces] = useState(() => {
         const saved = getWorkspaceStore().workspaces;
         return saved.length > 0 ? saved : initialWorkspaces;
@@ -19,6 +22,7 @@ export const WorkspacesPage = () => {
     const handleCreateWorkspace = (newWsData) => {
         const newWs = {
             ...newWsData,
+            kind: newWsData.kind || 'general',
             id: Date.now(),
             collaborators: 1,
             lastUpdated: 'Just now',
@@ -26,6 +30,7 @@ export const WorkspacesPage = () => {
         };
         setWorkspaces((prev) => [newWs, ...prev]);
         saveWorkspace(newWs);
+        navigate(getWorkspacePath(newWs));
     };
     const handleUpdateWorkspace = (updatedWorkspace) => {
         setWorkspaces((current) => current.map((workspace) => workspace.id === updatedWorkspace.id ? updatedWorkspace : workspace));

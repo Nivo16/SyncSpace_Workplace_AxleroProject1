@@ -12,6 +12,7 @@ const emptyState = {
     documents: {},
     history: {},
     preferences: {},
+    interviews: {},
 };
 const readState = () => {
     if (typeof window === 'undefined')
@@ -28,6 +29,7 @@ const readState = () => {
             documents: parsed.documents && typeof parsed.documents === 'object' ? parsed.documents : {},
             history: parsed.history && typeof parsed.history === 'object' ? parsed.history : {},
             preferences: parsed.preferences && typeof parsed.preferences === 'object' ? parsed.preferences : {},
+            interviews: parsed.interviews && typeof parsed.interviews === 'object' ? parsed.interviews : {},
         };
     }
     catch {
@@ -102,6 +104,23 @@ export const saveWorkspace = (workspace) => {
     updateWorkspaceStore((current) => ({
         ...current,
         workspaces: [workspace, ...current.workspaces.filter((item) => item.id !== workspace.id)],
+    }));
+};
+export const getInterviewRecord = (workspaceId) => (
+    readState().interviews[String(workspaceId)] ?? null
+);
+export const saveInterviewRecord = (workspaceId, record) => {
+    updateWorkspaceStore((current) => ({
+        ...current,
+        interviews: {
+            ...current.interviews,
+            [String(workspaceId)]: {
+                ...(current.interviews[String(workspaceId)] || {}),
+                ...record,
+                workspaceId,
+                updatedAt: new Date().toISOString(),
+            },
+        },
     }));
 };
 export const saveActivity = (activity) => {

@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
+import { displayNameFromEmail, setCurrentUserName } from "../data/currentUser";
 import "./Login.css";
 
 function Login() {
@@ -6,7 +7,10 @@ function Login() {
 
   const handleLogin = (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
+    const email = form.querySelector('input[type="email"]')?.value || "";
     window.localStorage.setItem("syncspace-authenticated", "true");
+    setCurrentUserName(displayNameFromEmail(email) || "You");
     const returnTo = new URLSearchParams(window.location.search).get("returnTo");
     navigate(returnTo || "/dashboard", { replace: true });
   };

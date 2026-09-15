@@ -1,5 +1,6 @@
 import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { WelcomeSection } from '../components/dashboard/WelcomeSection';
 import { StatsCard } from '../components/dashboard/StatsCard';
@@ -10,7 +11,9 @@ import { JoinWorkspaceModal } from '../components/modals/JoinWorkspaceModal';
 import { EditWorkspaceModal } from '../components/modals/EditWorkspaceModal';
 import { initialWorkspaces, initialActivities } from '../data/mockData';
 import { getWorkspaceStore, saveActivity, saveWorkspace, subscribeToWorkspaceStore } from '../data/workspaceStore';
+import { getWorkspacePath } from '../types/workspace';
 export const Dashboard = ({ readOnly = false }) => {
+    const navigate = useNavigate();
     const [store, setStore] = useState(() => getWorkspaceStore());
     const [workspaces, setWorkspaces] = useState(() => {
         const saved = getWorkspaceStore().workspaces;
@@ -33,6 +36,7 @@ export const Dashboard = ({ readOnly = false }) => {
     const handleCreateWorkspace = (newWsData) => {
         const newWs = {
             ...newWsData,
+            kind: newWsData.kind || 'general',
             id: Date.now(),
             collaborators: 1,
             lastUpdated: 'Just now',
@@ -50,6 +54,7 @@ export const Dashboard = ({ readOnly = false }) => {
         };
         setActivities((prev) => [newActivity, ...prev]);
         saveActivity(newActivity);
+        if (!readOnly) navigate(getWorkspacePath(newWs));
     };
     const handleJoinWorkspace = (code) => {
         const newActivity = {

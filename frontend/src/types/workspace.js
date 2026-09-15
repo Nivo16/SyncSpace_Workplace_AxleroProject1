@@ -4,6 +4,20 @@ export const WorkspaceType = {
   CODE_AND_WHITEBOARD: 'Code + Whiteboard',
 };
 
+/** Workspace category: general collaboration vs technical interview. Separate from tool type. */
+export const WorkspaceKind = {
+  GENERAL: 'general',
+  INTERVIEW: 'interview',
+};
+
+export const isInterviewWorkspace = (workspace) =>
+  workspace?.kind === WorkspaceKind.INTERVIEW;
+
+export const getWorkspacePath = (workspace) =>
+  isInterviewWorkspace(workspace)
+    ? `/interview/${workspace.id}`
+    : `/workspaces/${workspace.id}`;
+
 export const WorkspaceStatus = {
   ACTIVE: 'Active',
   OFFLINE: 'Offline',

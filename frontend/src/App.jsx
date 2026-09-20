@@ -9,6 +9,8 @@ import { WorkspacePage } from './pages/Workspace';
 import { InterviewWorkspacePage } from './features/interview/pages/InterviewWorkspace';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import RoomTest from './pages/RoomTest';
+import YjsTest from './pages/YjsTest';   
 
 function ProtectedRoute({ children }) {
   const location = useLocation();
@@ -28,6 +30,8 @@ export function App() {
             <Route path="/" element={<Dashboard readOnly />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/room-test" element={<RoomTest />} />
+            <Route path="/yjs-test" element={<YjsTest />} />   {/* ← new */}
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/workspaces" element={<ProtectedRoute><WorkspacesPage /></ProtectedRoute>} />
             <Route path="/sessions" element={<ProtectedRoute><SessionsPage /></ProtectedRoute>} />

@@ -98,12 +98,6 @@
   height: 8px;
   border-radius: 50%;
   background: #22d3ee;
-  animation: interview-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes interview-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
 }
 
 .interview-controls {

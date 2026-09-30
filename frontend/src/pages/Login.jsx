@@ -1,44 +1,41 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { displayNameFromEmail, setCurrentUserName } from "../data/currentUser";
+import { Eye, EyeOff, AlertCircle } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 import "./Login.css";
+
+const ROLE_HOME = { admin: "/admin", interviewer: "/interviews", user: "/dashboard" };
 
 function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const handleLogin = async (event) => {
     event.preventDefault();
     setError("");
-    const form = event.currentTarget;
-    const email = form.querySelector('input[type="email"]')?.value || "";
-    const password = form.querySelector('input[type="password"]')?.value || "";
+
+    if (!email || !password) {
+      setError("Please enter both your email and password.");
+      return;
+    }
 
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || "Login failed");
-        setLoading(false);
-        return;
-      }
-
-      window.localStorage.setItem("syncspace-authenticated", "true");
-      window.localStorage.setItem("syncspace-token", data.token);
-      setCurrentUserName(data.user?.name || displayNameFromEmail(email) || "You");
-
+      const user = await login(email, password);
       const returnTo = new URLSearchParams(window.location.search).get("returnTo");
-      navigate(returnTo || "/dashboard", { replace: true });
+      navigate(returnTo || ROLE_HOME[user.role] || "/dashboard", { replace: true });
     } catch (err) {
-      setError("Could not reach server. Is the backend running?");
+      if (err.status === 400) {
+        setError("Invalid email or password. Please try again.");
+      } else {
+        setError(err.message || "Could not reach the server. Is the backend running?");
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -56,17 +53,48 @@ function Login() {
           <h2>Welcome Back</h2>
           <p className="login-subtitle">Sign in to continue to your workspace</p>
 
-          {error && <p style={{ color: "red" }}>{error}</p>}
+          {error && (
+            <div className="auth-alert" role="alert">
+              <AlertCircle className="w-4 h-4" />
+              <span>{error}</span>
+            </div>
+          )}
 
-          <form onSubmit={handleLogin}>
+          <form onSubmit={handleLogin} noValidate>
             <div className="input-group">
-              <label>Email</label>
-              <input type="email" placeholder="Enter your email" required />
+              <label htmlFor="login-email">Email</label>
+              <input
+                id="login-email"
+                type="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                required
+              />
             </div>
 
             <div className="input-group">
-              <label>Password</label>
-              <input type="password" placeholder="Enter your password" required />
+              <label htmlFor="login-password">Password</label>
+              <div className="password-field">
+                <input
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="forgot-password">
@@ -74,7 +102,7 @@ function Login() {
             </div>
 
             <button type="submit" className="login-button" disabled={loading}>
-              {loading ? "Logging in..." : "Login"}
+              {loading ? "Signing in…" : "Sign In"}
             </button>
           </form>
 

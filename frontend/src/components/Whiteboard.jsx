@@ -7,7 +7,7 @@ import { getWorkspaceDocument, saveWorkspaceDocument } from "../data/workspaceSt
 import { getCurrentUserName } from "../data/currentUser";
 import "./Whiteboard.css";
 
-function Whiteboard({ workspaceId, onActivity }) {
+function Whiteboard({ workspaceId, roomId, onActivity }) {
   const containerRef = useRef(null);
   const transformerRef = useRef(null);
   const savedWhiteboard = getWorkspaceDocument(workspaceId).whiteboardState || {};
@@ -34,7 +34,7 @@ function Whiteboard({ workspaceId, onActivity }) {
 
   useEffect(() => {
     const ydoc = new Y.Doc();
-    const provider = new SocketIOProvider("http://localhost:5000", `whiteboard-${workspaceId || "default"}`, ydoc, { autoConnect: true });
+    const provider = new SocketIOProvider("http://localhost:5000", `whiteboard-${roomId || workspaceId || "default"}`, ydoc, { autoConnect: true });
     const yShapes = ydoc.getArray("shapes");
     ydocRef.current = ydoc;
     providerRef.current = provider;

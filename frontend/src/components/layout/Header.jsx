@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Menu, Bell, Search, LogIn, UserPlus, LogOut, Zap, Palette, Check, Moon, Sun } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { useTheme, THEME_OPTIONS } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/Button';
 
 export const Header = ({ title = 'Dashboard', onMenuClick, searchQuery = '', setSearchQuery }) => {
@@ -11,12 +12,10 @@ export const Header = ({ title = 'Dashboard', onMenuClick, searchQuery = '', set
   const [themeOpen, setThemeOpen] = useState(false);
   const { showToast } = useToast();
   const { theme, setTheme } = useTheme();
-
-  const isAuthenticated = window.localStorage.getItem('syncspace-authenticated') === 'true';
+  const { isAuthenticated, logout, user } = useAuth();
 
   const handleLogout = () => {
-    window.localStorage.removeItem('syncspace-authenticated');
-    window.localStorage.removeItem('syncspace-token');
+    logout();
     showToast('Logged out', 'info');
     navigate('/login', { replace: true });
   };

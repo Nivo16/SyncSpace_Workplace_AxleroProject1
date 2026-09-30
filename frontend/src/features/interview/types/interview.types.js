@@ -19,12 +19,6 @@ export const InterviewRole = {
   CANDIDATE: 'candidate',
 };
 
-export const DifficultyLevel = {
-  EASY: 'Easy',
-  MEDIUM: 'Medium',
-  HARD: 'Hard',
-};
-
 export const QuestionCategory = {
   ALGORITHMS: 'Algorithms',
   DATA_STRUCTURES: 'Data Structures',
@@ -53,7 +47,6 @@ export const QuestionCategory = {
  * @property {number} id
  * @property {string} title
  * @property {string} description
- * @property {'Easy'|'Medium'|'Hard'} difficulty
  * @property {string} category
  * @property {string} [starterCode]
  */

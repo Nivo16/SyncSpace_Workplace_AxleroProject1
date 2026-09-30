@@ -1,28 +1,22 @@
 import { useState } from 'react';
-import { Mic } from 'lucide-react';
+import { Mic, ListChecks } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
-import { InterviewRole, DifficultyLevel } from '../types/interview.types';
 
 export function InterviewSetup({
   workspaceName,
   defaultCandidate = '',
-  defaultDuration = 45,
-  defaultDifficulty = DifficultyLevel.MEDIUM,
-  defaultRole = InterviewRole.INTERVIEWER,
+  defaultDuration = 60,
+  questionCount = 0,
   onStart,
 }) {
   const [candidateName, setCandidateName] = useState(defaultCandidate);
   const [durationMinutes, setDurationMinutes] = useState(defaultDuration);
-  const [difficulty, setDifficulty] = useState(defaultDifficulty);
-  const [role, setRole] = useState(defaultRole);
 
   const handleSubmit = (event) => {
     event.preventDefault();
     onStart({
       candidateName: candidateName.trim() || 'Candidate',
-      durationMinutes: Number(durationMinutes) || 45,
-      difficulty,
-      role,
+      durationMinutes: Number(durationMinutes) || 60,
     });
   };
 
@@ -35,8 +29,13 @@ export function InterviewSetup({
         <p className="interview-kicker">Interview Setup</p>
         <h2>{workspaceName}</h2>
         <p className="interview-setup-copy">
-          Confirm the candidate and session details, then start the live interview.
+          This session uses the questions configured by the interviewer. There are no fixed Easy / Medium / Hard levels.
         </p>
+
+        <div className="mb-5 flex items-center gap-2 text-sm text-slate-400">
+          <ListChecks className="w-4 h-4 text-cyan-400" />
+          {questionCount} question{questionCount === 1 ? '' : 's'} configured
+        </div>
 
         <form onSubmit={handleSubmit} className="interview-setup-form">
           <label>
@@ -51,47 +50,15 @@ export function InterviewSetup({
 
           <label>
             Duration
-            <select
-              value={durationMinutes}
-              onChange={(event) => setDurationMinutes(Number(event.target.value))}
-            >
+            <select value={durationMinutes} onChange={(event) => setDurationMinutes(Number(event.target.value))}>
               <option value={15}>15 minutes</option>
               <option value={30}>30 minutes</option>
               <option value={45}>45 minutes</option>
               <option value={60}>60 minutes</option>
+              <option value={90}>90 minutes</option>
+              <option value={120}>120 minutes</option>
             </select>
           </label>
-
-          <label>
-            Difficulty
-            <select value={difficulty} onChange={(event) => setDifficulty(event.target.value)}>
-              <option value={DifficultyLevel.EASY}>Easy</option>
-              <option value={DifficultyLevel.MEDIUM}>Medium</option>
-              <option value={DifficultyLevel.HARD}>Hard</option>
-            </select>
-          </label>
-
-          <fieldset className="interview-role-fieldset">
-            <legend>Your role</legend>
-            <label className={role === InterviewRole.INTERVIEWER ? 'selected' : ''}>
-              <input
-                type="radio"
-                name="interview-role"
-                checked={role === InterviewRole.INTERVIEWER}
-                onChange={() => setRole(InterviewRole.INTERVIEWER)}
-              />
-              Interviewer
-            </label>
-            <label className={role === InterviewRole.CANDIDATE ? 'selected' : ''}>
-              <input
-                type="radio"
-                name="interview-role"
-                checked={role === InterviewRole.CANDIDATE}
-                onChange={() => setRole(InterviewRole.CANDIDATE)}
-              />
-              Candidate
-            </label>
-          </fieldset>
 
           <Button type="submit" variant="thunder">
             Start Interview

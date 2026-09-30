@@ -2,13 +2,14 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { writeAudit } = require("../utils/audit");
 
 const router = express.Router();
 
 // Signup
 router.post("/signup", async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
@@ -20,17 +21,23 @@ router.post("/signup", async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, email, password: hashedPassword });
+    // Public signup never trusts a client-supplied privileged role.
+    // Admins can promote users later through the protected admin endpoint.
+    const userRole = 'user';
+
+    const user = await User.create({ name, email, password: hashedPassword, role: userRole });
 
     const token = jwt.sign(
-      { userId: user._id, email: user.email },
+      { userId: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
+    await writeAudit({ user: { userId: user._id, email: user.email, role: user.role } }, "auth.signup", "user", user._id, { email: user.email });
+
     res.status(201).json({
       token,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { id: user._id, name: user.name, email: user.email, role: user.role, phone: user.phone || "", bio: user.bio || "", avatarUrl: user.avatarUrl || "" },
     });
   } catch (err) {
     console.error("Signup error:", err.message);
@@ -58,18 +65,60 @@ router.post("/login", async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user._id, email: user.email },
+      { userId: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
+    await writeAudit({ user: { userId: user._id, email: user.email, role: user.role } }, "auth.login", "user", user._id, { email: user.email });
     res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { id: user._id, name: user.name, email: user.email, role: user.role, phone: user.phone || "", bio: user.bio || "", avatarUrl: user.avatarUrl || "" },
     });
   } catch (err) {
     console.error("Login error:", err.message);
     res.status(500).json({ message: "Server error during login" });
+  }
+});
+
+// Get the currently authenticated user — used by the frontend on app load
+// to validate a stored token and recover the user's role, instead of
+// trusting whatever was last cached client-side.
+const { requireAuth } = require("../middleware/auth");
+router.get("/me", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ user: { id: user._id, name: user.name, email: user.email, role: user.role, phone: user.phone || "", bio: user.bio || "", avatarUrl: user.avatarUrl || "" } });
+  } catch (err) {
+    console.error("Me error:", err.message);
+    res.status(500).json({ message: "Server error fetching profile" });
+  }
+});
+
+
+router.patch("/me", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (req.body.name !== undefined) user.name = String(req.body.name).trim();
+    if (req.body.email !== undefined) {
+      const email = String(req.body.email).trim().toLowerCase();
+      if (!email) return res.status(400).json({ message: "Email is required" });
+      const duplicate = await User.findOne({ email, _id: { $ne: user._id } });
+      if (duplicate) return res.status(409).json({ message: "Email already registered" });
+      user.email = email;
+    }
+    if (req.body.phone !== undefined) user.phone = String(req.body.phone || "").trim();
+    if (req.body.bio !== undefined) user.bio = String(req.body.bio || "").trim();
+    if (req.body.avatarUrl !== undefined) user.avatarUrl = String(req.body.avatarUrl || "").trim();
+    if (req.body.password) user.password = await bcrypt.hash(String(req.body.password), 10);
+    await user.save();
+    await writeAudit(req, "profile.updated", "user", user._id, { fields: Object.keys(req.body).filter((k) => k !== "password") });
+    res.json({ user: { id: user._id, name: user.name, email: user.email, role: user.role, phone: user.phone || "", bio: user.bio || "", avatarUrl: user.avatarUrl || "" } });
+  } catch (err) {
+    console.error("Profile update error:", err.message);
+    res.status(500).json({ message: "Server error updating profile" });
   }
 });
 

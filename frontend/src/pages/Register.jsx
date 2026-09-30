@@ -1,50 +1,45 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { setCurrentUserName } from "../data/currentUser";
+import { Eye, EyeOff, AlertCircle } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 import "./Register.css";
 
 function Register() {
   const navigate = useNavigate();
+  const { register } = useAuth();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [role, setRole] = useState("user");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const handleRegister = async (event) => {
     event.preventDefault();
     setError("");
-    const form = event.currentTarget;
-    const fullName = form.querySelector('input[type="text"]')?.value || "";
-    const email = form.querySelector('input[type="email"]')?.value || "";
-    const passwordInputs = form.querySelectorAll('input[type="password"]');
-    const password = passwordInputs[0]?.value || "";
-    const confirmPassword = passwordInputs[1]?.value || "";
 
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError("Passwords do not match.");
       return;
     }
 
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: fullName, email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || "Registration failed");
-        setLoading(false);
-        return;
-      }
-
-      window.localStorage.setItem("syncspace-authenticated", "true");
-      window.localStorage.setItem("syncspace-token", data.token);
-      setCurrentUserName(data.user?.name || fullName || "You");
-      navigate("/dashboard", { replace: true });
+      await register(name, email, password, role);
+      navigate(role === "interviewer" ? "/interviews" : "/dashboard", { replace: true });
     } catch (err) {
-      setError("Could not reach server. Is the backend running?");
+      if (err.status === 400) {
+        setError(err.message || "That email is already registered.");
+      } else {
+        setError(err.message || "Could not reach the server. Is the backend running?");
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -62,31 +57,57 @@ function Register() {
           <h2>Create Account</h2>
           <p className="register-subtitle">Join SyncSpace and start collaborating</p>
 
-          {error && <p style={{ color: "red" }}>{error}</p>}
+          {error && (
+            <div className="auth-alert" role="alert">
+              <AlertCircle className="w-4 h-4" />
+              <span>{error}</span>
+            </div>
+          )}
 
-          <form onSubmit={handleRegister}>
+          <form onSubmit={handleRegister} noValidate>
             <div className="register-input-group">
-              <label>Full Name</label>
-              <input type="text" placeholder="Enter your full name" required />
+              <label htmlFor="reg-name">Full Name</label>
+              <input id="reg-name" type="text" placeholder="Enter your full name" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
 
             <div className="register-input-group">
-              <label>Email</label>
-              <input type="email" placeholder="Enter your email" required />
+              <label htmlFor="reg-email">Email</label>
+              <input id="reg-email" type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
 
             <div className="register-input-group">
-              <label>Password</label>
-              <input type="password" placeholder="Create a password" required />
+              <label htmlFor="reg-role">I am joining as a</label>
+              <select id="reg-role" value={role} onChange={(e) => setRole(e.target.value)} required>
+                <option value="user">Candidate / User — join interviews & collaborate</option>
+                <option value="interviewer">Interviewer — create & run interviews</option>
+              </select>
+              <span className="field-hint">Admin accounts are provisioned separately and can't be self-registered.</span>
             </div>
 
             <div className="register-input-group">
-              <label>Confirm Password</label>
-              <input type="password" placeholder="Confirm your password" required />
+              <label htmlFor="reg-password">Password</label>
+              <div className="password-field">
+                <input
+                  id="reg-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="At least 6 characters"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button type="button" className="password-toggle" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Hide password" : "Show password"}>
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="register-input-group">
+              <label htmlFor="reg-confirm">Confirm Password</label>
+              <input id="reg-confirm" type={showPassword ? "text" : "password"} placeholder="Confirm your password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
             </div>
 
             <button type="submit" className="register-button" disabled={loading}>
-              {loading ? "Creating account..." : "Create Account"}
+              {loading ? "Creating account…" : "Create Account"}
             </button>
           </form>
 

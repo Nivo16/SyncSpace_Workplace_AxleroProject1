@@ -5,14 +5,27 @@ const http = require("http");
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
 const Y = require("yjs");
+const jwt = require("jsonwebtoken");
 const authRoutes = require("./routes/auth");
+const interviewRoutes = require("./routes/interviews");
+const adminRoutes = require("./routes/admin");
+const auditRoutes = require("./routes/audit");
+const workspaceRoutes = require("./routes/workspaces");
+const recordingRoutes = require("./routes/recordings");
+const workspaceFileRoutes = require("./routes/workspaceFiles");
 const { YSocketIO } = require("y-socket.io/dist/server");
 const YjsDocument = require("./models/YjsDocument");
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "8mb" }));
 app.use("/api/auth", authRoutes);
+app.use("/api/interviews", interviewRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/audit", auditRoutes);
+app.use("/api/workspaces", workspaceRoutes);
+app.use("/api/workspaces/:workspaceId/files", workspaceFileRoutes);
+app.use("/api/recordings", recordingRoutes);
 
 app.get("/ping", (req, res) => {
   res.json({ status: "ok", message: "server is alive" });
@@ -32,6 +45,8 @@ mongoose
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
 });
+
+app.set("io", io);
 
 const ysocketio = new YSocketIO(io);
 ysocketio.initialize();
@@ -81,9 +96,33 @@ ysocketio.on("document-update", (doc) => {
 
 const rooms = new Map();
 
+// Attach the authenticated user (if any) to the socket. Sockets used for
+// public/anonymous flows (e.g. pre-join mic test) are still allowed to
+// connect without a token; but any identity-bearing signaling (e.g. who is
+// muted) trusts this decoded token rather than a client-supplied name.
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, process.env.JWT_SECRET);
+      socket.data.user = { userId: payload.userId, email: payload.email, role: payload.role };
+    } catch (err) {
+      // invalid token: proceed unauthenticated rather than hard-failing the socket,
+      // since some rooms (whiteboard demo/test pages) don't require auth
+      console.warn("Socket auth token invalid:", err.message);
+    }
+  }
+  next();
+});
+
 io.on("connection", (socket) => {
   console.log(`User connected: ${socket.id}`);
-  socket.emit("connected", { socketId: socket.id });
+  socket.emit("connected", { socketId: socket.id, user: socket.data.user || null });
+
+  socket.on("join-workspace", (workspaceId) => {
+    if (!workspaceId) return;
+    socket.join(`workspace:${workspaceId}`);
+  });
 
   socket.on("join-room", (roomId) => {
     socket.join(roomId);
@@ -93,9 +132,56 @@ io.on("connection", (socket) => {
     rooms.get(roomId).add(socket.id);
 
     console.log(`${socket.id} joined room ${roomId}`);
-    console.log(`  room ${roomId} members:`, [...rooms.get(roomId)]);
 
-    socket.to(roomId).emit("user-joined", { userId: socket.id });
+    socket.to(roomId).emit("user-joined", {
+      userId: socket.id,
+      name: socket.data.user?.email || null,
+      role: socket.data.user?.role || null,
+    });
+
+    // Tell the newcomer who's already in the room so it can initiate
+    // WebRTC offers to each existing peer (mesh signaling).
+    const others = [...(rooms.get(roomId) || [])].filter((id) => id !== socket.id);
+    socket.emit("room-peers", { peers: others });
+  });
+
+  // --- WebRTC signaling relay (audio) ---
+  // The server never touches media itself; it only relays SDP/ICE between
+  // peers already confirmed to be in the same room. Actual audio flows
+  // peer-to-peer once the connection is negotiated.
+  socket.on("webrtc-offer", ({ to, offer }) => {
+    if (!to || !offer) return;
+    io.to(to).emit("webrtc-offer", { from: socket.id, offer });
+  });
+
+  socket.on("webrtc-answer", ({ to, answer }) => {
+    if (!to || !answer) return;
+    io.to(to).emit("webrtc-answer", { from: socket.id, answer });
+  });
+
+  socket.on("webrtc-ice-candidate", ({ to, candidate }) => {
+    if (!to || !candidate) return;
+    io.to(to).emit("webrtc-ice-candidate", { from: socket.id, candidate });
+  });
+
+  socket.on("mic-state", ({ muted }) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    socket.to(roomId).emit("mic-state", { userId: socket.id, muted: Boolean(muted) });
+  });
+
+  // --- Chat (per-room text chat, distinct from the global help chatbox) ---
+  socket.on("chat-message", ({ text }) => {
+    const roomId = socket.data.roomId;
+    if (!roomId || !text) return;
+    const message = {
+      id: `${socket.id}-${Date.now()}`,
+      userId: socket.id,
+      name: socket.data.user?.email || "Guest",
+      text: String(text).slice(0, 2000),
+      sentAt: new Date().toISOString(),
+    };
+    io.to(roomId).emit("chat-message", message);
   });
 
   socket.on("leave-room", () => {
@@ -122,6 +208,10 @@ function cleanupSocket(socket) {
   socket.to(roomId).emit("user-left", { userId: socket.id });
   socket.data.roomId = null;
 }
+
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled promise rejection:", err);
+});
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

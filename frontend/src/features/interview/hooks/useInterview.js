@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { InterviewRole, InterviewStatus, DifficultyLevel } from '../types/interview.types';
-import { interviewQuestions } from '../data/interviewQuestions';
+import { InterviewRole, InterviewStatus } from '../types/interview.types';
 import * as interviewService from '../services/interviewService';
 import { getCurrentUserName } from '../../../data/currentUser';
 import { getInterviewRecord, saveInterviewRecord } from '../../../data/workspaceStore';
+import { interviewsApi } from '../../../api/client';
 
 const initials = (name) =>
   String(name || '')
@@ -13,46 +13,63 @@ const initials = (name) =>
     .map((part) => part[0]?.toUpperCase())
     .join('') || '?';
 
-/**
- * Interview state for a workspace. Local persistence is real (workspace store).
- * Service calls are stubs until a dedicated interview backend exists.
- */
-export function useInterview(workspaceId, workspace) {
+export function useInterview(workspaceId, workspace, backendInterview = null, authRole = null) {
   const saved = getInterviewRecord(workspaceId) || {};
-  const interviewerName = getCurrentUserName() || workspace?.owner || 'Interviewer';
+  const isBackend = Boolean(backendInterview);
+  const interviewerName =
+    backendInterview?.interviewer?.name ||
+    getCurrentUserName() ||
+    workspace?.owner ||
+    'Interviewer';
+  const candidateName =
+    backendInterview?.candidateInfo?.name ||
+    (backendInterview?.candidateEmail ? backendInterview.candidateEmail.split('@')[0] : '') ||
+    saved.candidateName ||
+    'Candidate';
 
-  const [status, setStatus] = useState(saved.status || InterviewStatus.SCHEDULED);
-  const [role, setRole] = useState(saved.role || InterviewRole.INTERVIEWER);
-  const [candidateName, setCandidateName] = useState(saved.candidateName || 'Candidate');
-  const [durationMinutes, setDurationMinutes] = useState(saved.durationMinutes || 45);
-  const [difficulty, setDifficulty] = useState(saved.difficulty || DifficultyLevel.MEDIUM);
+  const [status, setStatus] = useState(backendInterview?.status || saved.status || InterviewStatus.SCHEDULED);
+  const [role] = useState(
+    authRole === 'admin' || authRole === 'interviewer'
+      ? InterviewRole.INTERVIEWER
+      : InterviewRole.CANDIDATE
+  );
   const [elapsedSeconds, setElapsedSeconds] = useState(saved.elapsedSeconds || 0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(saved.currentQuestionIndex || 0);
-  const [notes, setNotes] = useState(saved.notes || '');
+  const [notes, setNotes] = useState(backendInterview?.notes || saved.notes || '');
   const timerRef = useRef(null);
   const elapsedRef = useRef(elapsedSeconds);
 
+  useEffect(() => {
+    if (backendInterview?.status) setStatus(backendInterview.status);
+    if (backendInterview?.notes !== undefined) setNotes(backendInterview.notes || '');
+  }, [backendInterview?.status, backendInterview?.notes]);
+
   elapsedRef.current = elapsedSeconds;
+
+  const questions = useMemo(() => {
+    if (isBackend) {
+      return Array.isArray(backendInterview?.questions) ? backendInterview.questions : [];
+    }
+    return [];
+  }, [isBackend, backendInterview?.questions]);
+
+  const currentQuestion = questions[currentQuestionIndex] || questions[0] || null;
 
   const persist = useCallback((patch) => {
     saveInterviewRecord(workspaceId, {
       status,
       role,
       candidateName,
-      durationMinutes,
-      difficulty,
       elapsedSeconds: elapsedRef.current,
       currentQuestionIndex,
       notes,
       ...patch,
     });
-  }, [workspaceId, status, role, candidateName, durationMinutes, difficulty, currentQuestionIndex, notes]);
+  }, [workspaceId, status, role, candidateName, currentQuestionIndex, notes]);
 
   const startTimer = useCallback(() => {
     if (timerRef.current) return;
-    timerRef.current = setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1);
-    }, 1000);
+    timerRef.current = setInterval(() => setElapsedSeconds((prev) => prev + 1), 1000);
   }, []);
 
   const stopTimer = useCallback(() => {
@@ -63,29 +80,13 @@ export function useInterview(workspaceId, workspace) {
   }, []);
 
   useEffect(() => () => stopTimer(), [stopTimer]);
-
   useEffect(() => {
     if (status === InterviewStatus.ACTIVE) startTimer();
   }, [status, startTimer]);
 
-  useEffect(() => {
-    if (status !== InterviewStatus.ACTIVE) return undefined;
-    const id = setInterval(() => {
-      persist({ elapsedSeconds: elapsedRef.current });
-    }, 5000);
-    return () => clearInterval(id);
-  }, [status, persist]);
-
-  const questions = useMemo(() => {
-    const matching = interviewQuestions.filter((question) => question.difficulty === difficulty);
-    return matching.length > 0 ? matching : interviewQuestions;
-  }, [difficulty]);
-
-  const currentQuestion = questions[currentQuestionIndex] || questions[0] || null;
-
   const nextQuestion = useCallback(() => {
     setCurrentQuestionIndex((prev) => {
-      const next = prev < questions.length - 1 ? prev + 1 : prev;
+      const next = Math.min(prev + 1, Math.max(questions.length - 1, 0));
       persist({ currentQuestionIndex: next });
       return next;
     });
@@ -93,88 +94,93 @@ export function useInterview(workspaceId, workspace) {
 
   const prevQuestion = useCallback(() => {
     setCurrentQuestionIndex((prev) => {
-      const next = prev > 0 ? prev - 1 : prev;
+      const next = Math.max(prev - 1, 0);
       persist({ currentQuestionIndex: next });
       return next;
     });
   }, [persist]);
 
-  const saveNotes = useCallback(() => {
+  const saveNotes = useCallback(async () => {
     persist({ notes });
-    interviewService.saveNotes(workspaceId, notes);
-  }, [workspaceId, notes, persist]);
+    if (isBackend && backendInterview?.id) {
+      await interviewsApi.update(backendInterview.id, { notes });
+    } else {
+      await interviewService.saveNotes(workspaceId, notes);
+    }
+  }, [backendInterview?.id, isBackend, notes, persist, workspaceId]);
 
-  const configureAndStart = useCallback((setup) => {
+  const configureAndStart = useCallback(async (setup = {}) => {
+    if (isBackend && backendInterview?.id) {
+      const { interview } = await interviewsApi.start(backendInterview.id);
+      setStatus(interview.status);
+      setElapsedSeconds(0);
+      setCurrentQuestionIndex(0);
+      startTimer();
+      persist({ status: interview.status, elapsedSeconds: 0, currentQuestionIndex: 0 });
+      return interview;
+    }
+
     const next = {
       status: InterviewStatus.ACTIVE,
-      role: setup.role || InterviewRole.INTERVIEWER,
-      candidateName: setup.candidateName || 'Candidate',
-      durationMinutes: setup.durationMinutes || 45,
-      difficulty: setup.difficulty || DifficultyLevel.MEDIUM,
+      role,
+      candidateName: setup.candidateName || candidateName,
       elapsedSeconds: 0,
+      currentQuestionIndex: 0,
       startedAt: new Date().toISOString(),
     };
     setStatus(next.status);
-    setRole(next.role);
-    setCandidateName(next.candidateName);
-    setDurationMinutes(next.durationMinutes);
-    setDifficulty(next.difficulty);
     setElapsedSeconds(0);
     setCurrentQuestionIndex(0);
     persist(next);
     startTimer();
-    interviewService.startInterview(workspaceId, next);
-  }, [persist, startTimer, workspaceId]);
+    return interviewService.startInterview(workspaceId, next);
+  }, [backendInterview?.id, candidateName, isBackend, persist, role, startTimer, workspaceId]);
 
   const pauseInterview = useCallback(() => {
     setStatus(InterviewStatus.PAUSED);
     stopTimer();
     persist({ status: InterviewStatus.PAUSED, elapsedSeconds: elapsedRef.current });
-    interviewService.pauseInterview(workspaceId);
-  }, [persist, stopTimer, workspaceId]);
+  }, [persist, stopTimer]);
 
   const resumeInterview = useCallback(() => {
     setStatus(InterviewStatus.ACTIVE);
     persist({ status: InterviewStatus.ACTIVE });
     startTimer();
-    interviewService.resumeInterview(workspaceId);
-  }, [persist, startTimer, workspaceId]);
+  }, [persist, startTimer]);
 
-  const endInterview = useCallback(() => {
-    setStatus(InterviewStatus.COMPLETED);
+  const endInterview = useCallback(async () => {
     stopTimer();
+    if (isBackend && backendInterview?.id) {
+      await interviewsApi.end(backendInterview.id);
+    }
+    setStatus(InterviewStatus.COMPLETED);
     persist({
       status: InterviewStatus.COMPLETED,
       elapsedSeconds: elapsedRef.current,
       endedAt: new Date().toISOString(),
     });
-    interviewService.endInterview(workspaceId);
-  }, [persist, stopTimer, workspaceId]);
-
-  const interviewer = {
-    id: 'interviewer',
-    name: interviewerName,
-    role: InterviewRole.INTERVIEWER,
-    status: 'online',
-    avatar: initials(interviewerName),
-  };
-
-  const candidate = {
-    id: 'candidate',
-    name: candidateName,
-    role: InterviewRole.CANDIDATE,
-    status: 'online',
-    avatar: initials(candidateName),
-  };
+    if (!isBackend) await interviewService.endInterview(workspaceId);
+  }, [backendInterview?.id, isBackend, persist, stopTimer, workspaceId]);
 
   return {
     status,
     role,
-    interviewer,
-    candidate,
+    interviewer: {
+      id: backendInterview?.interviewer?.id || backendInterview?.interviewer || 'interviewer',
+      name: interviewerName,
+      role: InterviewRole.INTERVIEWER,
+      status: 'online',
+      avatar: initials(interviewerName),
+    },
+    candidate: {
+      id: backendInterview?.candidate || 'candidate',
+      name: candidateName,
+      role: InterviewRole.CANDIDATE,
+      status: 'online',
+      avatar: initials(candidateName),
+    },
     elapsedSeconds,
-    durationMinutes,
-    difficulty,
+    durationMinutes: backendInterview?.durationMinutes || 60,
     questions,
     currentQuestion,
     currentQuestionIndex,

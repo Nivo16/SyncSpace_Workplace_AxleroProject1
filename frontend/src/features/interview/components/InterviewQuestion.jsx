@@ -1,11 +1,5 @@
 import { ChevronLeft, ChevronRight, ListChecks } from 'lucide-react';
 
-const difficultyClass = {
-  Easy: 'interview-diff-easy',
-  Medium: 'interview-diff-medium',
-  Hard: 'interview-diff-hard',
-};
-
 export function InterviewQuestion({
   question,
   questionIndex = 0,
@@ -32,10 +26,7 @@ export function InterviewQuestion({
       </div>
 
       <div className="interview-question-meta">
-        <span className={`interview-diff ${difficultyClass[question.difficulty] || ''}`}>
-          {question.difficulty}
-        </span>
-        <span className="interview-category">{question.category}</span>
+        <span className="interview-category">{question.category || 'General'}</span>
       </div>
 
       <h4 className="interview-question-title">{question.title}</h4>

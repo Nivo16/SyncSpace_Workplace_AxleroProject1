@@ -9,7 +9,7 @@ export const JoinWorkspaceModal = ({ isOpen, onClose, onJoin }) => {
   const [error, setError] = useState('');
   const { showToast } = useToast();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const trimmedCode = code.trim();
 
@@ -19,7 +19,7 @@ export const JoinWorkspaceModal = ({ isOpen, onClose, onJoin }) => {
       return;
     }
 
-    const success = onJoin(trimmedCode);
+    const success = await onJoin(trimmedCode);
 
     if (!success) {
       setError('No workspace found with that code.');

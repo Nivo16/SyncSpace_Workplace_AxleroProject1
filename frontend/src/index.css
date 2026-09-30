@@ -62,73 +62,25 @@
   }
 }
 
-/* Dynamic Keyframes using CSS Variables */
-@keyframes thunder-pulse {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.35;
-    box-shadow: 0 0 20px rgba(var(--color-primary), 0.4), inset 0 0 15px rgba(var(--color-primary-accent), 0.3);
-  }
-  50% {
-    transform: scale(1.02);
-    opacity: 0.85;
-    box-shadow: 0 0 50px rgba(var(--color-primary), 0.8), 0 0 100px rgba(var(--color-primary-accent), 0.5), inset 0 0 30px rgba(var(--color-primary), 0.5);
-  }
-  100% {
-    transform: scale(0.95);
-    opacity: 0.35;
-    box-shadow: 0 0 20px rgba(var(--color-primary), 0.4), inset 0 0 15px rgba(var(--color-primary-accent), 0.3);
-  }
-}
-
-@keyframes lightning-flash {
-  0%, 100% { opacity: 0.2; filter: hue-rotate(0deg); }
-  10% { opacity: 0.9; filter: hue-rotate(15deg) brightness(1.4); }
-  12% { opacity: 0.4; }
-  15% { opacity: 1; filter: brightness(2); }
-  25% { opacity: 0.3; }
-  60% { opacity: 0.7; }
-  62% { opacity: 0.2; }
-}
-
-@keyframes electric-border-beam {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-.animate-thunder-pulse {
-  animation: thunder-pulse 3s infinite ease-in-out;
-}
-
-.animate-lightning-flash {
-  animation: lightning-flash 4s infinite linear;
-}
-
-.electric-border-gradient {
-  background: linear-gradient(90deg, rgba(var(--color-primary), 1), rgba(var(--color-primary-accent), 1), rgba(var(--color-primary), 1));
-  background-size: 300% 300%;
-  animation: electric-border-beam 4s ease infinite;
-}
-
 /* Glassmorphism Electric Card */
 .electric-card {
   background: var(--color-card-bg);
   backdrop-filter: blur(12px);
   border: 1px solid var(--color-border);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), 0 0 15px 0 var(--color-glow);
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.2);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 8px;
 }
 
 .electric-card:hover {
-  border-color: rgba(var(--color-primary), 0.6);
-  box-shadow: 0 12px 40px 0 rgba(var(--color-primary), 0.3), 0 0 25px 0 var(--color-glow);
+  border-color: rgba(var(--color-primary), 0.4);
+  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.25);
   transform: translateY(-2px);
 }
 
 /* Light Mode Overrides */
 [data-theme="light"] .electric-card {
-  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.06), 0 0 10px 0 rgba(99, 102, 241, 0.1);
+  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.06);
 }
 
 [data-theme="light"] [class*="bg-slate-950"] {

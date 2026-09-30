@@ -1,6 +1,6 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import WorkspaceHeader from '../components/WorkspaceHeader';
 import WorkspaceSidebar from '../components/WorkspaceSidebar';
 import Whiteboard from '../components/Whiteboard';
@@ -10,71 +10,69 @@ import HistoryPanel from '../components/HistoryTemp';
 import SettingsPanel from '../components/SettingsPanel';
 import { clearWorkspaceHistory, getWorkspaceHistory, getWorkspacePreferences, getWorkspaceStore, saveWorkspace, saveWorkspaceHistory, saveWorkspacePreferences } from '../data/workspaceStore';
 import { isInterviewWorkspace } from '../types/workspace';
+import { workspaceApi } from '../api/client';
+import { useToast } from '../context/ToastContext';
 import './Workspace.css';
+
+const MONGO_ID_RE = /^[a-f0-9]{24}$/i;
+
 export const WorkspacePage = () => {
-    const { id = 'workspace' } = useParams();
-    const navigate = useNavigate();
-    const workspace = getWorkspaceStore().workspaces.find((item) => item.id.toString() === id);
-    const workspaceId = Number(id) || 0;
-    const fallbackWorkspace = { id: workspaceId, name: `Workspace ${id}`, description: 'Collaborative workspace', collaborators: 1, lastUpdated: 'Just now', status: 'Active', type: 'Code + Whiteboard', owner: 'You' };
-    const [currentWorkspace, setCurrentWorkspace] = useState(workspace || fallbackWorkspace);
-    const workspaceType = currentWorkspace.type;
-    const hasWhiteboard = workspaceType === 'Whiteboard' || workspaceType === 'Code + Whiteboard';
-    const hasCodeEditor = workspaceType === 'Code Editor' || workspaceType === 'Code + Whiteboard';
-    const hasBothTools = hasWhiteboard && hasCodeEditor;
-    const defaultTab = hasWhiteboard ? 'whiteboard' : 'code';
-    const [activeTab, setActiveTab] = useState(defaultTab);
-    const [splitRatio, setSplitRatio] = useState(() => getWorkspacePreferences(workspaceId).splitRatio);
-    const [historyEntries, setHistoryEntries] = useState(() => getWorkspaceHistory(workspaceId));
-    const visibleTabs = [
-        'workspace',
-        ...(hasWhiteboard ? ['whiteboard'] : []),
-        ...(hasCodeEditor ? ['code'] : []),
-        'users',
-        'history',
-        'settings',
-    ];
-    const safeActiveTab = visibleTabs.includes(activeTab) ? activeTab : defaultTab;
-    const recordActivity = (action, source) => {
-        saveWorkspaceHistory(workspaceId, { action, source });
-        setHistoryEntries(getWorkspaceHistory(workspaceId));
-    };
-    const handleAddUser = (user) => {
-        const existingUsers = currentWorkspace.collaboratorList || [
-            { id: 'owner', name: currentWorkspace.owner || 'You', role: 'Owner', status: 'online' },
-        ];
-        const nextWorkspace = {
-            ...currentWorkspace,
-            collaboratorList: [...existingUsers, user],
-            collaborators: existingUsers.length + 1,
-            lastUpdated: 'Just now',
-        };
-        setCurrentWorkspace(nextWorkspace);
-        saveWorkspace(nextWorkspace);
-        recordActivity(`${user.name} joined the workspace`, 'workspace');
-    };
-    const handleDownload = () => {
-        const exportData = {
-            workspace: currentWorkspace,
-            document: getWorkspaceStore().documents[String(workspaceId)] || {},
-            history: getWorkspaceHistory(workspaceId),
-        };
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${currentWorkspace.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'syncspace-workspace'}.json`;
-        link.click();
-        URL.revokeObjectURL(url);
-        recordActivity('Downloaded the workspace project', 'workspace');
-    };
-    const handleSplitRatioChange = (value) => {
-        setSplitRatio(value);
-        saveWorkspacePreferences(workspaceId, { splitRatio: value });
-    };
-    const showingManagementPanel = ['users', 'history', 'settings'].includes(safeActiveTab);
-    if (workspace && isInterviewWorkspace(workspace)) {
-        return _jsx(Navigate, { to: `/interview/${id}`, replace: true });
-    }
-    return (_jsxs("div", { className: "workspace", "data-active-tab": safeActiveTab, children: [_jsx(WorkspaceHeader, { roomId: id, workspaceName: currentWorkspace.name, workspaceType: workspaceType, onLeave: () => navigate('/dashboard') }), _jsxs("div", { className: "workspace-body", children: [_jsx(WorkspaceSidebar, { activeTab: safeActiveTab, setActiveTab: setActiveTab, visibleTabs: visibleTabs }), _jsxs("main", { className: `workspace-main ${showingManagementPanel ? 'workspace-main-single' : ''}`, style: { gridTemplateColumns: showingManagementPanel || !hasBothTools ? '1fr' : `${splitRatio}fr ${100 - splitRatio}fr` }, children: [safeActiveTab === 'users' && _jsx(UsersPanel, { workspace: currentWorkspace, onAddUser: handleAddUser }), safeActiveTab === 'history' && _jsx(HistoryPanel, { entries: historyEntries, onClear: () => { clearWorkspaceHistory(workspaceId); setHistoryEntries([]); } }), safeActiveTab === 'settings' && _jsx(SettingsPanel, { splitRatio: splitRatio, hasBothTools: hasBothTools, onSplitRatioChange: handleSplitRatioChange, onDownload: handleDownload }), !showingManagementPanel && hasWhiteboard && (_jsxs("section", { className: "whiteboard-panel", "data-panel": "whiteboard", children: [_jsxs("div", { className: "panel-title", children: ["Whiteboard ", _jsx("span", { children: "Visual workspace" })] }), _jsx(Whiteboard, { workspaceId: workspaceId, onActivity: recordActivity })] })), !showingManagementPanel && hasCodeEditor && (_jsxs("section", { className: "code-panel", "data-panel": "code", children: [_jsxs("div", { className: "panel-title", children: ["Code Editor ", _jsx("span", { children: "Project files" })] }), _jsx(CodeEditor, { workspaceId: workspaceId, onActivity: recordActivity })] }))] })] })] }));
+  const { id = '' } = useParams();
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+  const localWorkspace = getWorkspaceStore().workspaces.find((item) => String(item.id) === String(id));
+  const [currentWorkspace, setCurrentWorkspace] = useState(localWorkspace || { id, name: 'Loading workspace…', description: '', collaborators: 0, status: 'Active', type: 'Code + Whiteboard' });
+  const [loading, setLoading] = useState(MONGO_ID_RE.test(String(id)));
+  const workspaceId = id;
+  const [activeTab, setActiveTab] = useState('whiteboard');
+  const [splitRatio, setSplitRatio] = useState(() => getWorkspacePreferences(workspaceId).splitRatio);
+  const [historyEntries, setHistoryEntries] = useState(() => getWorkspaceHistory(workspaceId));
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!MONGO_ID_RE.test(String(id))) { setLoading(false); return undefined; }
+    workspaceApi.get(id).then(({ workspace }) => { if (!cancelled) setCurrentWorkspace(workspace); }).catch((err) => showToast(err.message || 'Could not load workspace', 'error')).finally(() => { if (!cancelled) setLoading(false); });
+    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000', { auth: { token: localStorage.getItem('syncspace-token') || '' } });
+    socket.on('connect', () => socket.emit('join-workspace', id));
+    socket.on('workspace:updated', (workspace) => { if (!cancelled) setCurrentWorkspace(workspace); });
+    socket.on('workspace:file-updated', (file) => {
+      if (!cancelled) window.dispatchEvent(new CustomEvent('syncspace:file-updated', { detail: file }));
+    });
+    socket.on('workspace:file-deleted', (payload) => {
+      if (!cancelled) window.dispatchEvent(new CustomEvent('syncspace:file-deleted', { detail: payload }));
+    });
+    return () => { cancelled = true; socket.disconnect(); };
+  }, [id]);
+
+  const workspaceType = currentWorkspace.type || 'Code + Whiteboard';
+  const hasWhiteboard = workspaceType === 'Whiteboard' || workspaceType === 'Code + Whiteboard';
+  const hasCodeEditor = workspaceType === 'Code Editor' || workspaceType === 'Code + Whiteboard';
+  const hasBothTools = hasWhiteboard && hasCodeEditor;
+  const defaultTab = hasWhiteboard ? 'whiteboard' : 'code';
+  const visibleTabs = useMemo(() => ['workspace', ...(hasWhiteboard ? ['whiteboard'] : []), ...(hasCodeEditor ? ['code'] : []), 'users', 'history', 'settings'], [hasWhiteboard, hasCodeEditor]);
+  const safeActiveTab = visibleTabs.includes(activeTab) ? activeTab : defaultTab;
+
+  const recordActivity = (action, source) => { saveWorkspaceHistory(workspaceId, { action, source }); setHistoryEntries(getWorkspaceHistory(workspaceId)); };
+  const handleAddUser = (user) => { const existing = currentWorkspace.collaboratorList || []; const next = { ...currentWorkspace, collaboratorList: [...existing, user], collaborators: existing.length + 1 }; setCurrentWorkspace(next); saveWorkspace(next); recordActivity(`${user.name} joined the workspace`, 'workspace'); };
+  const handleDownload = () => { const exportData = { workspace: currentWorkspace, document: getWorkspaceStore().documents[String(workspaceId)] || {}, history: getWorkspaceHistory(workspaceId) }; const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${currentWorkspace.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'workspace'}.json`; a.click(); URL.revokeObjectURL(url); recordActivity('Downloaded workspace project', 'workspace'); };
+  const showingManagement = ['users', 'history', 'settings'].includes(safeActiveTab);
+
+  if (localWorkspace && isInterviewWorkspace(localWorkspace)) return <Navigate to={`/interview/${id}`} replace />;
+  if (loading) return <div className="min-h-screen bg-slate-950 text-slate-400 flex items-center justify-center">Loading workspace…</div>;
+
+  return <div className="workspace" data-active-tab={safeActiveTab}>
+    <WorkspaceHeader roomId={currentWorkspace.roomId || id} inviteCode={currentWorkspace.inviteCode || currentWorkspace.code} collaborators={currentWorkspace.collaboratorList || []} workspaceName={currentWorkspace.name} workspaceType={workspaceType} onLeave={() => navigate('/dashboard')} />
+    <div className="workspace-body">
+      <WorkspaceSidebar activeTab={safeActiveTab} setActiveTab={setActiveTab} visibleTabs={visibleTabs} />
+      <main className={`workspace-main ${showingManagement ? 'workspace-main-single' : ''}`} style={{ gridTemplateColumns: showingManagement || !hasBothTools ? '1fr' : `${splitRatio}fr ${100 - splitRatio}fr` }}>
+        {safeActiveTab === 'users' && <UsersPanel workspace={currentWorkspace} onAddUser={handleAddUser} />}
+        {safeActiveTab === 'history' && <HistoryPanel entries={historyEntries} onClear={() => { clearWorkspaceHistory(workspaceId); setHistoryEntries([]); }} />}
+        {safeActiveTab === 'settings' && <SettingsPanel splitRatio={splitRatio} hasBothTools={hasBothTools} onSplitRatioChange={(v) => { setSplitRatio(v); saveWorkspacePreferences(workspaceId, { splitRatio: v }); }} onDownload={handleDownload} />}
+        {!showingManagement && safeActiveTab === 'workspace' && hasWhiteboard && <section className="whiteboard-panel"><div className="panel-title">Whiteboard <span>Visual workspace</span></div><Whiteboard workspaceId={workspaceId} roomId={currentWorkspace.roomId || workspaceId} onActivity={recordActivity} /></section>}
+        {!showingManagement && safeActiveTab === 'workspace' && hasCodeEditor && <section className="code-panel"><div className="panel-title">Code Editor <span>Persistent project files</span></div><CodeEditor workspaceId={workspaceId} roomId={currentWorkspace.roomId || workspaceId} onActivity={recordActivity} /></section>}
+        {!showingManagement && safeActiveTab === 'whiteboard' && hasWhiteboard && <section className="whiteboard-panel"><div className="panel-title">Whiteboard <span>Visual workspace</span></div><Whiteboard workspaceId={workspaceId} roomId={currentWorkspace.roomId || workspaceId} onActivity={recordActivity} /></section>}
+        {!showingManagement && safeActiveTab === 'code' && hasCodeEditor && <section className="code-panel"><div className="panel-title">Code Editor <span>Persistent project files</span></div><CodeEditor workspaceId={workspaceId} roomId={currentWorkspace.roomId || workspaceId} onActivity={recordActivity} /></section>}
+      </main>
+    </div>
+  </div>;
 };

@@ -1,91 +1,212 @@
-/**
- * Interview Service — frontend adapters for Interview Mode.
- *
- * There is no dedicated interview REST API in the current backend
- * (Socket.IO room server only). These methods persist locally via the
- * workspace store when possible and stay ready to swap in real HTTP calls.
- *
- * Future endpoints could follow the existing /api style:
- * POST /interviews, GET /interviews/:id, POST /interviews/:id/start|pause|end
- */
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "/api";
 
-const LOG_PREFIX = '[InterviewService]';
+const getToken = () => {
+  return (
+    localStorage.getItem("syncspace-token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("auth-token") ||
+    ""
+  );
+};
 
-/**
- * Create a new interview session for a workspace.
- */
-export const createInterview = async (workspaceId, data) => {
-  console.log(LOG_PREFIX, 'createInterview', { workspaceId, data });
+const request = async (path, options = {}) => {
+  const token = getToken();
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : {}),
+    ...(options.headers || {}),
+  };
+
+  let response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    console.error("Interview API network error:", error);
+
+    throw new Error(
+      "Unable to connect to the interview server. Please check that the backend is running."
+    );
+  }
+
+  let data = {};
+
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
+
+  if (!response.ok) {
+    const message =
+      data?.message ||
+      data?.error ||
+      `Request failed with status ${response.status}`;
+
+    throw new Error(message);
+  }
+
+  return data;
+};
+
+export const getInterview = async (workspaceId) => {
+  if (!workspaceId) {
+    throw new Error("Workspace ID is required");
+  }
+
+  return request(`/interviews/${workspaceId}`);
+};
+
+export const syncInterview = async (workspaceId) => {
+  return getInterview(workspaceId);
+};
+
+export const createInterview = async (
+  workspaceId,
+  payload = {}
+) => {
+  if (!workspaceId) {
+    throw new Error("Workspace ID is required");
+  }
+
+  return request(`/interviews/${workspaceId}`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const updateInterview = async (
+  workspaceId,
+  updates = {}
+) => {
+  if (!workspaceId) {
+    throw new Error("Workspace ID is required");
+  }
+
+  return request(`/interviews/${workspaceId}`, {
+    method: "PUT",
+    body: JSON.stringify(updates),
+  });
+};
+
+export const startInterview = async (workspaceId) => {
+  if (!workspaceId) {
+    throw new Error("Workspace ID is required");
+  }
+
+  return request(`/interviews/${workspaceId}/start`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+};
+
+export const pauseInterview = async (
+  workspaceId,
+  elapsedSeconds
+) => {
+  if (!workspaceId) {
+    throw new Error("Workspace ID is required");
+  }
+
+  const payload =
+    elapsedSeconds !== undefined
+      ? { elapsedSeconds }
+      : {};
+
+  return request(`/interviews/${workspaceId}/pause`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const resumeInterview = async (workspaceId) => {
+  if (!workspaceId) {
+    throw new Error("Workspace ID is required");
+  }
+
+  return request(`/interviews/${workspaceId}/resume`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+};
+
+export const endInterview = async (
+  workspaceId,
+  elapsedSeconds
+) => {
+  if (!workspaceId) {
+    throw new Error("Workspace ID is required");
+  }
+
+  const payload =
+    elapsedSeconds !== undefined
+      ? { elapsedSeconds }
+      : {};
+
+  return request(`/interviews/${workspaceId}/end`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const saveNotes = async (
+  workspaceId,
+  notes
+) => {
+  if (!workspaceId) {
+    throw new Error("Workspace ID is required");
+  }
+
+  return request(`/interviews/${workspaceId}/notes`, {
+    method: "PUT",
+    body: JSON.stringify({
+      notes: notes || "",
+    }),
+  });
+};
+
+export const getInterviewQuestions = async (
+  workspaceId
+) => {
+  if (!workspaceId) {
+    throw new Error("Workspace ID is required");
+  }
+
+  const data = await request(
+    `/interviews/${workspaceId}/questions`
+  );
+
   return {
-    id: `interview-${workspaceId}-${Date.now()}`,
-    workspaceId,
-    status: 'scheduled',
-    ...data,
-    createdAt: new Date().toISOString(),
+    questions: Array.isArray(data?.questions)
+      ? data.questions
+      : [],
+    currentQuestionIndex:
+      Number(data?.currentQuestionIndex) || 0,
   };
 };
 
-/**
- * Fetch interview data by workspace ID.
- */
-export const getInterview = async (workspaceId) => {
-  console.log(LOG_PREFIX, 'getInterview', { workspaceId });
-  return null; // No backend yet — caller falls back to local state
-};
+export const createInterviewQuestion = async (
+  workspaceId,
+  question = {}
+) => {
+  if (!workspaceId) {
+    throw new Error("Workspace ID is required");
+  }
 
-/**
- * Update interview fields (status, notes, etc.).
- */
-export const updateInterview = async (workspaceId, updates) => {
-  console.log(LOG_PREFIX, 'updateInterview', { workspaceId, updates });
-  return { workspaceId, ...updates, updatedAt: new Date().toISOString() };
-};
-
-/**
- * Start an interview session.
- */
-export const startInterview = async (workspaceId, data = {}) => {
-  console.log(LOG_PREFIX, 'startInterview', { workspaceId, data });
-  return { workspaceId, status: 'active', startedAt: new Date().toISOString(), ...data };
-};
-
-/**
- * Pause an active interview.
- */
-export const pauseInterview = async (workspaceId) => {
-  console.log(LOG_PREFIX, 'pauseInterview', { workspaceId });
-  return { workspaceId, status: 'paused' };
-};
-
-/**
- * Resume a paused interview.
- */
-export const resumeInterview = async (workspaceId) => {
-  console.log(LOG_PREFIX, 'resumeInterview', { workspaceId });
-  return { workspaceId, status: 'active' };
-};
-
-/**
- * End an interview session.
- */
-export const endInterview = async (workspaceId) => {
-  console.log(LOG_PREFIX, 'endInterview', { workspaceId });
-  return { workspaceId, status: 'completed', endedAt: new Date().toISOString() };
-};
-
-/**
- * Save interviewer notes.
- */
-export const saveNotes = async (workspaceId, notes) => {
-  console.log(LOG_PREFIX, 'saveNotes', { workspaceId, notesLength: notes.length });
-  return { workspaceId, notes, savedAt: new Date().toISOString() };
-};
-
-/**
- * Fetch questions for an interview.
- * Currently returns null — the caller uses the local question bank.
- */
-export const getQuestions = async (workspaceId) => {
-  console.log(LOG_PREFIX, 'getQuestions', { workspaceId });
-  return null;
+  return request(
+    `/interviews/${workspaceId}/questions`,
+    {
+      method: "POST",
+      body: JSON.stringify(question),
+    }
+  );
 };

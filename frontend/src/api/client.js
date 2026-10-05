@@ -73,6 +73,7 @@ export const workspaceApi = {
     create: (payload) => authRequest('/workspaces', { method: 'POST', body: JSON.stringify(payload) }),
     join: (code) => authRequest(`/workspaces/${encodeURIComponent(code)}/join`, { method: 'POST' }),
     update: (id, payload) => authRequest(`/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+    remove: (id) => authRequest(`/workspaces/${id}`, { method: 'DELETE' }),
 };
 
 export const workspaceFilesApi = {

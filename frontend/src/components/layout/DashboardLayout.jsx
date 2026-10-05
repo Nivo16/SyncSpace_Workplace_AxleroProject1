@@ -5,9 +5,9 @@ import { Header } from './Header';
 export const DashboardLayout = ({ children, title = 'Dashboard', searchQuery, setSearchQuery }) => {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:flex-row antialiased relative">
+    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased relative">
       <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
-      <div className="flex-1 flex flex-col min-w-0 z-10">
+      <div className="min-h-screen flex flex-col min-w-0 lg:ml-64">
         <Header 
           title={title} 
           onMenuClick={() => setMobileOpen(true)} 

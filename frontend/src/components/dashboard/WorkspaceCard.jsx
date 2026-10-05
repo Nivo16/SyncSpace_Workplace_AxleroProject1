@@ -4,9 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { Code2, Palette, Layers, Users, Clock, ArrowRight, Pencil, Mic } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { getWorkspacePath, isInterviewWorkspace } from '../../types/workspace';
-import { getInterviewRecord } from '../../data/workspaceStore';
-export const WorkspaceCard = ({ workspace, onEdit, readOnly = false }) => {
+import { getInterviewRecord, getWorkspaceStatus } from '../../data/workspaceStore';
+export const WorkspaceCard = ({ workspace: sourceWorkspace, onEdit, readOnly = false }) => {
     const navigate = useNavigate();
+    const workspace = { ...sourceWorkspace };
     const interview = isInterviewWorkspace(workspace);
     const interviewRecord = interview ? getInterviewRecord(workspace.id) : null;
     const getTypeIcon = (type) => {
@@ -22,8 +23,10 @@ export const WorkspaceCard = ({ workspace, onEdit, readOnly = false }) => {
                 return _jsx(Layers, { className: "w-4 h-4 text-cyan-400" });
         }
     };
-    const isOnline = workspace.status === 'Active';
     const interviewStatus = interviewRecord?.status || 'scheduled';
+    const status = getWorkspaceStatus(workspace);
+    workspace.status = status;
+    const isOnline = status === 'Active';
     return (_jsxs("div", { className: "electric-card rounded-2xl p-5 flex flex-col justify-between group", children: [_jsxs("div", { children: [_jsxs("div", { className: "flex items-start justify-between gap-3 mb-3", children: [_jsxs("div", { className: "flex items-center gap-3", children: [_jsx("div", { className: `w-10 h-10 rounded-xl bg-slate-900 border flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-md ${interview ? 'border-violet-400/40 shadow-violet-950' : 'border-cyan-500/30 shadow-cyan-950'}`, children: getTypeIcon(workspace.type) }), _jsxs("div", { children: [_jsx("h3", { className: "font-bold text-base text-slate-100 group-hover:text-cyan-300 transition-colors line-clamp-1", children: workspace.name }), _jsx("span", { className: "text-[11px] text-cyan-400 font-mono", children: workspace.code || `SYNC-${workspace.id}` })] })] }), _jsxs("div", { className: `
             flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border shrink-0
             ${isOnline ? 'bg-cyan-950/80 border-cyan-500/50 text-cyan-300 shadow-sm shadow-cyan-500/30' : 'bg-slate-900 border-slate-800 text-slate-400'}

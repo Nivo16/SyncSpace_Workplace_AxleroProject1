@@ -12,19 +12,19 @@ export const Sidebar = ({ mobileOpen, setMobileOpen }) => {
     { name: 'Workspaces', path: '/workspaces', icon: FolderKanban },
     { name: 'Interviews', path: '/interviews', icon: Video },
     { name: 'Recent Sessions', path: '/sessions', icon: History },
-    { name: 'Audit Logs', path: '/audit-logs', icon: ScrollText },
+    { name: 'Activity History', path: '/audit-logs', icon: ScrollText },
     ...(role === 'admin' || role === 'interviewer' ? [{ name: 'Recordings', path: '/recordings', icon: PlaySquare }] : []),
     ...(role === 'admin' ? [{ name: 'Admin', path: '/admin', icon: ShieldCheck }] : []),
   ];
   return (
     <>
       {mobileOpen && <div className="fixed inset-0 z-40 bg-slate-950/85 backdrop-blur-md lg:hidden" onClick={() => setMobileOpen(false)} />}
-      <aside className={`fixed top-0 bottom-0 left-0 z-40 w-64 bg-slate-950/90 backdrop-blur-xl border-r border-cyan-500/20 flex flex-col justify-between transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:z-auto ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div>
+      <aside className={`fixed top-0 bottom-0 left-0 z-40 w-64 overflow-hidden bg-slate-950/90 backdrop-blur-xl border-r border-cyan-500/20 flex flex-col justify-between transition-transform duration-300 ease-in-out lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800/80">
             <button type="button" className="flex items-center gap-3" onClick={() => navigate('/dashboard')}>
               <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 via-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-cyan-500/30"><Layers className="w-5 h-5 text-white" /></div>
-              <div className="flex flex-col text-left"><span className="font-extrabold text-lg text-slate-100 tracking-tight flex items-center gap-1">SyncSpace <Zap className="w-3.5 h-3.5 text-cyan-400" /></span><span className="text-[9px] uppercase font-bold tracking-widest text-cyan-400 -mt-1">Thunder Workspace</span></div>
+              <div className="flex flex-col text-left"><span className="font-extrabold text-lg text-slate-100 tracking-tight flex items-center gap-1">SyncSpace <Zap className="w-3.5 h-3.5 text-cyan-400" /></span></div>
             </button>
             <button onClick={() => setMobileOpen(false)} className="lg:hidden text-slate-400 p-1.5"><X className="w-5 h-5" /></button>
           </div>

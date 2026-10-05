@@ -24,7 +24,7 @@ export const WorkspacePage = () => {
   const [currentWorkspace, setCurrentWorkspace] = useState(localWorkspace || { id, name: 'Loading workspace…', description: '', collaborators: 0, status: 'Active', type: 'Code + Whiteboard' });
   const [loading, setLoading] = useState(MONGO_ID_RE.test(String(id)));
   const workspaceId = id;
-  const [activeTab, setActiveTab] = useState('whiteboard');
+  const [activeTab, setActiveTab] = useState('workspace');
   const [splitRatio, setSplitRatio] = useState(() => getWorkspacePreferences(workspaceId).splitRatio);
   const [historyEntries, setHistoryEntries] = useState(() => getWorkspaceHistory(workspaceId));
 
@@ -45,8 +45,8 @@ export const WorkspacePage = () => {
   }, [id]);
 
   const workspaceType = currentWorkspace.type || 'Code + Whiteboard';
-  const hasWhiteboard = workspaceType === 'Whiteboard' || workspaceType === 'Code + Whiteboard';
-  const hasCodeEditor = workspaceType === 'Code Editor' || workspaceType === 'Code + Whiteboard';
+  const hasWhiteboard = workspaceType !== 'Code Editor';
+  const hasCodeEditor = workspaceType !== 'Whiteboard';
   const hasBothTools = hasWhiteboard && hasCodeEditor;
   const defaultTab = hasWhiteboard ? 'whiteboard' : 'code';
   const visibleTabs = useMemo(() => ['workspace', ...(hasWhiteboard ? ['whiteboard'] : []), ...(hasCodeEditor ? ['code'] : []), 'users', 'history', 'settings'], [hasWhiteboard, hasCodeEditor]);

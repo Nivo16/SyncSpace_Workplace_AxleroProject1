@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Bell, Search, LogIn, UserPlus, LogOut, Zap, Palette, Check, Moon, Sun } from 'lucide-react';
+import { Menu, Bell, Search, LogIn, UserPlus, LogOut, Zap, Moon, Sun } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
-import { useTheme, THEME_OPTIONS } from '../../context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/Button';
 
 export const Header = ({ title = 'Dashboard', onMenuClick, searchQuery = '', setSearchQuery }) => {
   const navigate = useNavigate();
   const [notifOpen, setNotifOpen] = useState(false);
-  const [themeOpen, setThemeOpen] = useState(false);
   const { showToast } = useToast();
   const { theme, setTheme } = useTheme();
-  const { isAuthenticated, logout, user } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -26,7 +25,6 @@ export const Header = ({ title = 'Dashboard', onMenuClick, searchQuery = '', set
     { id: 3, title: 'Weekly activity summary ready', time: '2h ago', unread: false },
   ];
 
-  const currentTheme = THEME_OPTIONS.find((t) => t.id === theme) || THEME_OPTIONS[0];
   const isLightMode = theme === 'light';
 
   return (
@@ -73,42 +71,7 @@ export const Header = ({ title = 'Dashboard', onMenuClick, searchQuery = '', set
 
         <div className="relative">
           <button
-            onClick={() => { setThemeOpen(!themeOpen); setNotifOpen(false); }}
-            className="p-2 rounded-xl text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-slate-800/80 transition-colors flex items-center gap-1.5 cursor-pointer"
-            aria-label="Change Theme"
-            title="Change Theme"
-          >
-            <Palette className="w-4 h-4" />
-            <span className="w-2.5 h-2.5 rounded-full ring-1 ring-white/20 hidden sm:inline-block" style={{ backgroundColor: currentTheme.color }} />
-          </button>
-          {themeOpen && (
-            <div className="absolute right-0 mt-2 w-56 bg-slate-950 border border-cyan-500/30 rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in duration-150">
-              <div className="pb-2 mb-2 border-b border-slate-800 px-2 flex items-center justify-between">
-                <span className="font-semibold text-xs text-slate-300 uppercase tracking-wider">Select Theme</span>
-                <Palette className="w-3.5 h-3.5 text-slate-500" />
-              </div>
-              <div className="space-y-1">
-                {THEME_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.id}
-                    onClick={() => { setTheme(opt.id); showToast(`Theme changed to ${opt.name}`, 'info'); setThemeOpen(false); }}
-                    className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${theme === opt.id ? 'bg-slate-800 text-white border border-cyan-500/40' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/90'}`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className="w-3 h-3 rounded-full shadow-sm ring-1 ring-white/20" style={{ backgroundColor: opt.color }} />
-                      <span>{opt.name}</span>
-                    </div>
-                    {theme === opt.id && <Check className="w-3.5 h-3.5 text-cyan-400" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="relative">
-          <button
-            onClick={() => { setNotifOpen(!notifOpen); setThemeOpen(false); }}
+            onClick={() => setNotifOpen(!notifOpen)}
             className="p-2 rounded-xl text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-slate-800/80 transition-colors relative cursor-pointer"
             aria-label="Notifications"
           >

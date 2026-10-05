@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { Plus, FolderPlus, Trash2, Save, FileCode2, Folder, ChevronRight, ChevronDown, Play, Terminal, X, RefreshCw } from 'lucide-react';
 import { workspaceFilesApi } from '../api/client';
@@ -14,19 +14,95 @@ const runJavaScript = (source) => new Promise((resolve) => {
   const workerCode = `
     self.onmessage = ({ data }) => {
       const logs = [];
-      const stringify = (v) => { try { return typeof v === 'string' ? v : JSON.stringify(v, null, 2); } catch { return String(v); } };
-      const consoleProxy = { log: (...a) => logs.push(a.map(stringify).join(' ')), info: (...a) => logs.push(a.map(stringify).join(' ')), warn: (...a) => logs.push('[warn] ' + a.map(stringify).join(' ')), error: (...a) => logs.push('[error] ' + a.map(stringify).join(' ')) };
-      try { new Function('console', data.code)(consoleProxy); self.postMessage({ ok: true, output: logs.join('\\n') || 'Program finished with no console output.' }); }
-      catch (error) { self.postMessage({ ok: false, output: error?.stack || error?.message || String(error) }); }
+      let outputLength = 0;
+      const stringify = (value) => { try { return typeof value === 'string' ? value : JSON.stringify(value, null, 2); } catch { return String(value); } };
+      const write = (level, values) => {
+        if (logs.length >= 500) throw new Error('Output limit reached (500 lines).');
+        const line = level + values.map(stringify).join(' ');
+        if (outputLength + line.length > 20000) throw new Error('Output limit reached (20,000 characters).');
+        logs.push(line);
+        outputLength += line.length;
+      };
+      const consoleProxy = {
+        log: (...values) => write('', values),
+        info: (...values) => write('', values),
+        warn: (...values) => write('[warn] ', values),
+        error: (...values) => write('[error] ', values),
+      };
+      try {
+        new Function('console', data.code)(consoleProxy);
+        self.postMessage({ ok: true, output: logs.join('\\n') || 'Program finished with no console output.' });
+      } catch (error) {
+        self.postMessage({ ok: false, output: [...logs, error?.message || String(error)].join('\\n') });
+      }
     };
   `;
   const blob = new Blob([workerCode], { type: 'text/javascript' });
   const workerUrl = URL.createObjectURL(blob);
   const worker = new Worker(workerUrl);
-  const cleanup = () => { worker.terminate(); URL.revokeObjectURL(workerUrl); };
-  const timer = setTimeout(() => { cleanup(); resolve({ ok: false, output: 'Execution timed out after 5 seconds.' }); }, 5000);
-  worker.onmessage = (event) => { clearTimeout(timer); cleanup(); resolve(event.data); };
+  let settled = false;
+  let timer;
+  const finish = (result) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    worker.terminate();
+    URL.revokeObjectURL(workerUrl);
+    resolve(result);
+  };
+  timer = setTimeout(() => finish({ ok: false, output: 'Execution timed out after 2 seconds.' }), 2000);
+  worker.onmessage = (event) => finish(event.data);
+  worker.onerror = (event) => finish({ ok: false, output: event.message || 'Could not run JavaScript.' });
   worker.postMessage({ code: source });
+});
+
+let pythonWorker;
+let pythonRequestSequence = 0;
+
+const runPython = (source, stdin, onStatus) => new Promise((resolve) => {
+  const worker = pythonWorker || (pythonWorker = new Worker(new URL('./pythonRunner.worker.js', import.meta.url), { type: 'module' }));
+  const requestId = ++pythonRequestSequence;
+  let timeout;
+  let settled = false;
+
+  const finish = (result, terminate = false) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timeout);
+    worker.removeEventListener('message', handleMessage);
+    worker.removeEventListener('error', handleError);
+    if (terminate) {
+      worker.terminate();
+      if (pythonWorker === worker) pythonWorker = undefined;
+    }
+    resolve(result);
+  };
+
+  const setExecutionTimeout = (milliseconds, message) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => finish({ ok: false, output: message }, true), milliseconds);
+  };
+
+  const handleMessage = ({ data }) => {
+    if (data.requestId !== requestId) return;
+    if (data.type === 'status') {
+      onStatus(data.status);
+      const running = data.status === 'Running Python…';
+      setExecutionTimeout(
+        running ? 10000 : 60000,
+        running ? 'Python execution timed out after 10 seconds.' : 'Python runtime loading timed out. Check your network and try again.'
+      );
+      return;
+    }
+    finish(data);
+  };
+
+  const handleError = (event) => finish({ ok: false, output: event.message || 'Could not start the Python runtime.' }, true);
+
+  worker.addEventListener('message', handleMessage);
+  worker.addEventListener('error', handleError);
+  setExecutionTimeout(60000, 'Python runtime loading timed out. Check your network and try again.');
+  worker.postMessage({ requestId, code: source, stdin });
 });
 
 function CodeEditor({ workspaceId, roomId, onActivity }) {
@@ -39,13 +115,15 @@ function CodeEditor({ workspaceId, roomId, onActivity }) {
   const [running, setRunning] = useState(false);
   const [output, setOutput] = useState('');
   const [runStatus, setRunStatus] = useState('idle');
+  const [stdin, setStdin] = useState('');
   const [expanded, setExpanded] = useState({});
+  const starterFileRequestRef = useRef(null);
 
   const files = useMemo(() => items.filter((x) => x.kind === 'file'), [items]);
   const folders = useMemo(() => items.filter((x) => x.kind === 'folder'), [items]);
   const activeFile = files.find((x) => x.id === activeId) || files[0] || null;
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!workspaceId || !/^[a-f0-9]{24}$/i.test(String(workspaceId))) {
       setLoading(false);
       return;
@@ -55,11 +133,19 @@ function CodeEditor({ workspaceId, roomId, onActivity }) {
       const { files: remote } = await workspaceFilesApi.list(workspaceId);
       let next = remote || [];
       if (!next.length) {
-        const a = await workspaceFilesApi.create(workspaceId, {
-          name: 'index.js',
-          language: 'javascript',
-          content: 'function hello() {\n  console.log("Hello SyncSpace!");\n}\n\nhello();',
-        });
+        const workspaceKey = String(workspaceId);
+        if (starterFileRequestRef.current?.workspaceId !== workspaceKey) {
+          const promise = workspaceFilesApi.create(workspaceId, {
+            name: 'index.js',
+            language: 'javascript',
+            content: 'function hello() {\n  console.log("Hello SyncSpace!");\n}\n\nhello();',
+          });
+          starterFileRequestRef.current = { workspaceId: workspaceKey, promise };
+          promise.catch(() => {
+            if (starterFileRequestRef.current?.promise === promise) starterFileRequestRef.current = null;
+          });
+        }
+        const a = await starterFileRequestRef.current.promise;
         next = [a.file];
       }
       setItems(next);
@@ -70,13 +156,13 @@ function CodeEditor({ workspaceId, roomId, onActivity }) {
     } catch (err) {
       showToast(err.message || 'Could not load project files', 'error');
     } finally { setLoading(false); }
-  };
+  }, [showToast, workspaceId]);
 
-  useEffect(() => { load(); }, [workspaceId]);
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     if (activeFile) setCode(activeFile.content || '');
-  }, [activeId]);
+  }, [activeFile]);
 
   useEffect(() => {
     if (!workspaceId || !/^[a-f0-9]{24}$/i.test(String(workspaceId))) return undefined;
@@ -100,7 +186,7 @@ function CodeEditor({ workspaceId, roomId, onActivity }) {
       window.removeEventListener('syncspace:file-updated', onRemoteUpdate);
       window.removeEventListener('syncspace:file-deleted', onRemoteDelete);
     };
-  }, [workspaceId]);
+  }, [activeId, workspaceId]);
 
   const selectFile = (file) => { setActiveId(file.id); setCode(file.content || ''); setOutput(''); setRunStatus('idle'); };
 
@@ -148,14 +234,17 @@ function CodeEditor({ workspaceId, roomId, onActivity }) {
         const result = await runJavaScript(code);
         setOutput(result.output); setRunStatus(result.ok ? 'success' : 'error');
         onActivity?.(`Ran ${activeFile.path}`, 'code');
+      } else if (activeFile.language === 'python') {
+        const result = await runPython(code, stdin, (status) => { setOutput(status); setRunStatus('running'); });
+        setOutput(result.output); setRunStatus(result.ok ? 'success' : 'error');
+        onActivity?.(`Ran ${activeFile.path}`, 'code');
       } else if (activeFile.language === 'html') {
-        const preview = `<html><body><p style="font-family:system-ui;color:#94a3b8">HTML preview opened in a new tab.</p><script>${''}</script></body></html>`;
         const win = window.open('', '_blank', 'noopener,noreferrer');
         if (win) { win.document.write(code); win.document.close(); setOutput('HTML preview opened in a new tab.'); setRunStatus('success'); }
         else { setOutput('Your browser blocked the preview tab. Allow pop-ups for SyncSpace.'); setRunStatus('error'); }
         onActivity?.(`Previewed ${activeFile.path}`, 'code');
       } else {
-        setOutput(`Run is currently available for JavaScript and HTML. The ${activeFile.language || 'current'} file can still be edited and saved.`);
+        setOutput(`Run is available for JavaScript, Python, and HTML. The ${activeFile.language || 'current'} file can still be edited and saved.`);
         setRunStatus('idle');
       }
     } catch (err) { setOutput(err.message || 'Could not run code.'); setRunStatus('error'); }
@@ -236,8 +325,9 @@ function CodeEditor({ workspaceId, roomId, onActivity }) {
             </div>
           </div>
           <div className="monaco-wrap"><Editor height="100%" language={activeFile?.language || 'plaintext'} value={code} theme="vs-dark" onChange={(v) => setCode(v || '')} options={{ fontSize: 14, minimap: { enabled: false }, automaticLayout: true, wordWrap: 'on', scrollBeyondLastLine: false, padding: { top: 12, bottom: 12 }, smoothScrolling: true }} /></div>
-          <div className={`editor-output ${runStatus}`}>
-            <div className="output-header"><div><Terminal /> Output</div><button type="button" onClick={() => { setOutput(''); setRunStatus('idle'); }} title="Clear output"><X /></button></div>
+          <div className={`editor-output ${runStatus} ${activeFile?.language === 'python' ? 'has-stdin' : ''}`}>
+            <div className="output-header"><div><Terminal /> Terminal</div><button type="button" onClick={() => { setOutput(''); setRunStatus('idle'); }} title="Clear terminal"><X /></button></div>
+            {activeFile?.language === 'python' && <label className="program-input"><span>Program input · one response per line</span><textarea value={stdin} onChange={(event) => setStdin(event.target.value)} placeholder={'Calculator example: enter each response on a new line\n1\n8\n2\n7'} spellCheck="false" /></label>}
             <pre className="output-content">{output || 'Run your JavaScript or HTML file to see output here.'}</pre>
           </div>
         </section>

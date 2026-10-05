@@ -1,10 +1,5 @@
-import { apiClient } from '../api/client';
 const storageKey = 'syncspace.workspace-store.v1';
 const storeEvent = 'syncspace:workspace-store-updated';
-let serverWriteQueue = Promise.resolve();
-const queueServerWrite = (write) => {
-    serverWriteQueue = serverWriteQueue.then(write, write).catch(() => undefined);
-};
 const emptyState = {
     workspaces: [],
     activities: [],
@@ -49,7 +44,6 @@ export const saveWorkspaceDocument = (workspaceId, document) => {
             },
         },
     }));
-    queueServerWrite(() => apiClient.saveDocument(workspaceId, document));
 };
 export const getWorkspaceStore = () => readState();
 export const getWorkspaceHistory = (workspaceId) => (readState().history[String(workspaceId)] ?? []);
@@ -64,7 +58,6 @@ export const saveWorkspaceHistory = (workspaceId, entry) => {
             ].slice(0, 100),
         },
     }));
-    queueServerWrite(() => apiClient.addHistory(workspaceId, entry));
 };
 export const clearWorkspaceHistory = (workspaceId) => {
     updateWorkspaceStore((current) => ({
@@ -78,7 +71,6 @@ export const saveWorkspacePreferences = (workspaceId, preferences) => {
         ...current,
         preferences: { ...current.preferences, [String(workspaceId)]: preferences },
     }));
-    queueServerWrite(() => apiClient.savePreferences(workspaceId, preferences));
 };
 export const updateWorkspaceStore = (update) => {
     const next = update(readState());
@@ -86,7 +78,6 @@ export const updateWorkspaceStore = (update) => {
         window.localStorage.setItem(storageKey, JSON.stringify(next));
         window.dispatchEvent(new CustomEvent(storeEvent));
     }
-    queueServerWrite(() => apiClient.saveState(next));
     return next;
 };
 export const subscribeToWorkspaceStore = (listener) => {
@@ -106,9 +97,35 @@ export const saveWorkspace = (workspace) => {
         workspaces: [workspace, ...current.workspaces.filter((item) => item.id !== workspace.id)],
     }));
 };
+export const deleteWorkspaceData = (workspaceId) => {
+    const id = String(workspaceId);
+    const removeKey = (record) => {
+        const next = { ...record };
+        delete next[id];
+        return next;
+    };
+    updateWorkspaceStore((current) => ({
+        ...current,
+        workspaces: current.workspaces.filter((workspace) => String(workspace.id) !== id),
+        documents: removeKey(current.documents),
+        history: removeKey(current.history),
+        preferences: removeKey(current.preferences),
+        interviews: removeKey(current.interviews),
+        activities: current.activities.filter((activity) => String(activity.workspaceId) !== id),
+        sessions: current.sessions.filter((session) => String(session.workspaceId) !== id),
+    }));
+};
 export const getInterviewRecord = (workspaceId) => (
     readState().interviews[String(workspaceId)] ?? null
 );
+export const getWorkspaceStatus = (workspace) => {
+    if (workspace?.kind !== 'interview') return workspace?.status || 'Offline';
+    const interviewStatus = getInterviewRecord(workspace.id)?.status || 'scheduled';
+    if (interviewStatus === 'active') return 'Active';
+    if (['completed', 'ended'].includes(interviewStatus)) return 'Offline';
+    if (interviewStatus === 'cancelled') return 'Cancelled';
+    return 'Scheduled';
+};
 export const saveInterviewRecord = (workspaceId, record) => {
     updateWorkspaceStore((current) => ({
         ...current,

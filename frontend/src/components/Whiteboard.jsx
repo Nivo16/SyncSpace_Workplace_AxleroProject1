@@ -7,6 +7,8 @@ import { getWorkspaceDocument, saveWorkspaceDocument } from "../data/workspaceSt
 import { getCurrentUserName } from "../data/currentUser";
 import "./Whiteboard.css";
 
+const createShapeId = () => Date.now() + Math.random();
+
 function Whiteboard({ workspaceId, roomId, onActivity }) {
   const containerRef = useRef(null);
   const transformerRef = useRef(null);
@@ -153,7 +155,7 @@ function Whiteboard({ workspaceId, roomId, onActivity }) {
     if (selectedTool === "text") {
       const userText = window.prompt("Enter your text:");
       if (userText && userText.trim() !== "") {
-        const newText = { id: Date.now(), x: p.x, y: p.y, text: userText, fontSize: 20 };
+        const newText = { id: createShapeId(), x: p.x, y: p.y, text: userText, fontSize: 20 };
         const updated = [...texts, newText];
         setTexts(updated);
         pushShapeToYjs("text", newText);
@@ -240,7 +242,7 @@ function Whiteboard({ workspaceId, roomId, onActivity }) {
     if (selectedTool === "select" || selectedTool === "eraser") return;
 
     if (newRectangle) {
-      const obj = { ...newRectangle, id: Date.now() };
+      const obj = { ...newRectangle, id: createShapeId() };
       const updated = [...rectangles, obj];
       setRectangles(updated);
       pushShapeToYjs("rectangle", obj);
@@ -248,7 +250,7 @@ function Whiteboard({ workspaceId, roomId, onActivity }) {
       setNewRectangle(null);
     }
     if (newCircle) {
-      const obj = { ...newCircle, id: Date.now() };
+      const obj = { ...newCircle, id: createShapeId() };
       const updated = [...circles, obj];
       setCircles(updated);
       pushShapeToYjs("circle", obj);
@@ -256,7 +258,7 @@ function Whiteboard({ workspaceId, roomId, onActivity }) {
       setNewCircle(null);
     }
     if (newLine) {
-      const obj = { ...newLine, x: 0, y: 0, id: Date.now() };
+      const obj = { ...newLine, x: 0, y: 0, id: createShapeId() };
       const updated = [...lines, obj];
       setLines(updated);
       pushShapeToYjs("line", obj);
@@ -264,7 +266,7 @@ function Whiteboard({ workspaceId, roomId, onActivity }) {
       setNewLine(null);
     }
     if (newFreehandLine) {
-      const obj = { ...newFreehandLine, x: 0, y: 0, id: Date.now() };
+      const obj = { ...newFreehandLine, x: 0, y: 0, id: createShapeId() };
       const updated = [...freehandLines, obj];
       setFreehandLines(updated);
       pushShapeToYjs("freehand", obj);
@@ -371,32 +373,32 @@ function Whiteboard({ workspaceId, roomId, onActivity }) {
       <div className="whiteboard-container" ref={containerRef}>
         <Stage width={size.width} height={size.height} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onClick={handleCanvasClick}>
           <Layer>
-            {rectangles.map((r) => (
-              <Rect key={r.id} id={r.id.toString()} name="rectangle" x={r.x} y={r.y} width={r.width} height={r.height} fill="#3b82f6" stroke="#2563eb" strokeWidth={2}
+            {rectangles.map((r, index) => (
+              <Rect key={`${r.id}-${index}`} id={r.id.toString()} name="rectangle" x={r.x} y={r.y} width={r.width} height={r.height} fill="#3b82f6" stroke="#2563eb" strokeWidth={2}
                 draggable={selectedTool === "select"} onDragMove={(e) => handleRectangleDrag(e, r.id)} onDragEnd={(e) => handleRectangleDragEnd(e, r.id)} onTransformEnd={handleTransformEnd} />
             ))}
             {newRectangle && <Rect x={newRectangle.x} y={newRectangle.y} width={newRectangle.width} height={newRectangle.height} fill="#93c5fd" stroke="#2563eb" strokeWidth={1} opacity={0.7} />}
 
-            {circles.map((c) => (
-              <Ellipse key={c.id} id={c.id.toString()} name="circle" x={c.x} y={c.y} radiusX={c.radiusX} radiusY={c.radiusY} fill="#a78bfa" stroke="#7c3aed" strokeWidth={1}
+            {circles.map((c, index) => (
+              <Ellipse key={`${c.id}-${index}`} id={c.id.toString()} name="circle" x={c.x} y={c.y} radiusX={c.radiusX} radiusY={c.radiusY} fill="#a78bfa" stroke="#7c3aed" strokeWidth={1}
                 draggable={selectedTool === "select"} onDragMove={(e) => handleCircleDrag(e, c.id)} onDragEnd={(e) => handleCircleDragEnd(e, c.id)} onTransformEnd={handleTransformEnd} />
             ))}
             {newCircle && <Ellipse x={newCircle.x} y={newCircle.y} radiusX={newCircle.radiusX} radiusY={newCircle.radiusY} fill="#c4b5fd" stroke="#7c3aed" strokeWidth={1} opacity={0.7} />}
 
-            {lines.map((l) => (
-              <Line key={l.id} id={l.id.toString()} name="line" x={l.x} y={l.y} points={l.points} stroke="#111827" strokeWidth={3} lineCap="round" lineJoin="round"
+            {lines.map((l, index) => (
+              <Line key={`${l.id}-${index}`} id={l.id.toString()} name="line" x={l.x} y={l.y} points={l.points} stroke="#111827" strokeWidth={3} lineCap="round" lineJoin="round"
                 draggable={selectedTool === "select"} onDragMove={(e) => handleLineDrag(e, l.id)} onDragEnd={(e) => handleLineDragEnd(e, l.id)} onTransformEnd={handleTransformEnd} />
             ))}
             {newLine && <Line points={newLine.points} stroke="#64748b" strokeWidth={3} lineCap="round" lineJoin="round" opacity={0.7} />}
 
-            {freehandLines.map((l) => (
-              <Line key={l.id} id={l.id.toString()} name="freehand" x={l.x} y={l.y} points={l.points} stroke="#111827" strokeWidth={3} lineCap="round" lineJoin="round" tension={0.5}
+            {freehandLines.map((l, index) => (
+              <Line key={`${l.id}-${index}`} id={l.id.toString()} name="freehand" x={l.x} y={l.y} points={l.points} stroke="#111827" strokeWidth={3} lineCap="round" lineJoin="round" tension={0.5}
                 draggable={selectedTool === "select"} onDragMove={(e) => handleFreehandDrag(e, l.id)} onDragEnd={(e) => handleFreehandDragEnd(e, l.id)} onTransformEnd={handleTransformEnd} />
             ))}
             {newFreehandLine && <Line points={newFreehandLine.points} stroke="#64748b" strokeWidth={3} lineCap="round" lineJoin="round" tension={0.5} opacity={0.7} />}
 
-            {texts.map((t) => (
-              <Text key={t.id} id={t.id.toString()} name="text" x={t.x} y={t.y} text={t.text} fontSize={t.fontSize || 20} fontFamily="Arial" fill="#111827"
+            {texts.map((t, index) => (
+              <Text key={`${t.id}-${index}`} id={t.id.toString()} name="text" x={t.x} y={t.y} text={t.text} fontSize={t.fontSize || 20} fontFamily="Arial" fill="#111827"
                 draggable={selectedTool === "select"} onDragMove={(e) => handleTextDrag(e, t.id)} onDragEnd={(e) => handleTextDragEnd(e, t.id)} onTransformEnd={handleTransformEnd} />
             ))}
 

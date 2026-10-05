@@ -5,11 +5,12 @@ import { CreateWorkspaceModal } from '../components/modals/CreateWorkspaceModal'
 import { EditWorkspaceModal } from '../components/modals/EditWorkspaceModal';
 import { JoinWorkspaceModal } from '../components/modals/JoinWorkspaceModal';
 import { Button } from '../components/ui/Button';
-import { Plus, Zap, Users, Link2 } from 'lucide-react';
+import { Plus, Zap, Link2, RefreshCw } from 'lucide-react';
 import { workspaceApi } from '../api/client';
 import { getWorkspacePath } from '../types/workspace';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
+import { deleteWorkspaceData } from '../data/workspaceStore';
 
 export const WorkspacesPage = () => {
   const navigate = useNavigate();
@@ -20,9 +21,31 @@ export const WorkspacesPage = () => {
   const [workspaceToEdit, setWorkspaceToEdit] = useState(null);
   const [joinModalOpen, setJoinModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const load = () => { setLoading(true); return workspaceApi.list().then((data) => setWorkspaces(data.workspaces || [])).catch((err) => showToast(err.message || 'Could not load workspaces', 'error')).finally(() => setLoading(false)); };
-  useEffect(load, []);
+  useEffect(() => {
+    let cancelled = false;
+    const loadWorkspaces = async () => {
+      setLoading(true);
+      setLoadError('');
+      try {
+        const data = await workspaceApi.list();
+        if (!cancelled) setWorkspaces(Array.isArray(data?.workspaces) ? data.workspaces : []);
+      } catch (err) {
+        if (!cancelled) {
+          const message = err.message || 'Could not load workspaces';
+          setLoadError(message);
+          showToast(message, 'error');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadWorkspaces();
+    return () => { cancelled = true; };
+  }, [reloadKey, showToast]);
 
   const handleCreateWorkspace = async (data) => {
     try {
@@ -42,19 +65,32 @@ export const WorkspacesPage = () => {
     } catch (err) { showToast(err.message || 'Could not update workspace', 'error'); }
   };
 
+  const handleDeleteWorkspace = async (workspace) => {
+    try {
+      await workspaceApi.remove(workspace.id);
+      deleteWorkspaceData(workspace.id);
+      setWorkspaces((current) => current.filter((item) => item.id !== workspace.id));
+      setWorkspaceToEdit(null);
+      showToast('Workspace deleted', 'success');
+    } catch (err) {
+      showToast(err.message || 'Could not delete workspace', 'error');
+      throw err;
+    }
+  };
+
   return (
     <DashboardLayout title="Workspaces" searchQuery={searchQuery} setSearchQuery={setSearchQuery}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">All Workspaces <Zap className="w-5 h-5 text-cyan-400" /></h2>
           <p className="text-sm text-slate-400">Live workspaces stored in MongoDB with secure share links.</p>
         </div>
-        <div className="flex gap-2"><Button variant="outline" icon={<Link2 className="w-4 h-4" />} onClick={() => setJoinModalOpen(true)}>Join Workspace</Button><Button variant="thunder" icon={<Plus className="w-4 h-4" />} onClick={() => setCreateModalOpen(true)}>Create Workspace</Button></div>
+        <div className="flex flex-wrap gap-2"><Button variant="outline" icon={<Link2 className="w-4 h-4" />} onClick={() => setJoinModalOpen(true)}>Join Workspace</Button><Button variant="thunder" icon={<Plus className="w-4 h-4" />} onClick={() => setCreateModalOpen(true)}>Create Workspace</Button></div>
       </div>
-      {loading ? <div className="py-16 text-center text-slate-500">Loading your workspaces…</div> : <WorkspaceGrid workspaces={workspaces} onCreateWorkspace={() => setCreateModalOpen(true)} onEditWorkspace={setWorkspaceToEdit} searchQuery={searchQuery} />}
+      {loading ? <div className="py-16 text-center text-slate-500">Loading your workspaces…</div> : loadError ? <div className="py-16 text-center"><p className="mb-4 text-sm text-rose-300">{loadError}</p><Button variant="outline" icon={<RefreshCw className="w-4 h-4" />} onClick={() => setReloadKey((key) => key + 1)}>Try again</Button></div> : <WorkspaceGrid workspaces={workspaces} onCreateWorkspace={() => setCreateModalOpen(true)} onEditWorkspace={setWorkspaceToEdit} searchQuery={searchQuery} />}
       <JoinWorkspaceModal isOpen={joinModalOpen} onClose={() => setJoinModalOpen(false)} onJoin={handleJoinWorkspace} />
       <CreateWorkspaceModal isOpen={createModalOpen} onClose={() => setCreateModalOpen(false)} onCreate={handleCreateWorkspace} />
-      <EditWorkspaceModal workspace={workspaceToEdit} onClose={() => setWorkspaceToEdit(null)} onSave={handleUpdateWorkspace} />
+      <EditWorkspaceModal key={workspaceToEdit?.id || 'closed'} workspace={workspaceToEdit} onClose={() => setWorkspaceToEdit(null)} onSave={handleUpdateWorkspace} onDelete={handleDeleteWorkspace} />
     </DashboardLayout>
   );
 };

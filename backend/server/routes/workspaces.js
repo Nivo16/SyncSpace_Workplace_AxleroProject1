@@ -1,5 +1,7 @@
 const express = require("express");
 const Workspace = require("../models/Workspace");
+const WorkspaceFile = require("../models/WorkspaceFile");
+const YjsDocument = require("../models/YjsDocument");
 const { requireAuth } = require("../middleware/auth");
 const { writeAudit } = require("../utils/audit");
 
@@ -139,6 +141,28 @@ router.patch("/:id", requireAuth, async (req, res) => {
     res.json({ workspace: serialize(ws) });
   } catch (err) {
     res.status(500).json({ message: "Server error updating workspace" });
+  }
+});
+
+router.delete("/:id", requireAuth, async (req, res) => {
+  try {
+    const ws = await Workspace.findById(req.params.id);
+    if (!ws) return res.status(404).json({ message: "Workspace not found" });
+    if (String(ws.owner) !== String(req.user.userId) && req.user.role !== "admin") {
+      return res.status(403).json({ message: "Only the workspace owner can delete it" });
+    }
+
+    await writeAudit(req, "workspace.deleted", "workspace", ws._id, { name: ws.name });
+    await Promise.all([
+      WorkspaceFile.deleteMany({ workspace: ws._id }),
+      YjsDocument.deleteMany({ roomName: `whiteboard-${ws.roomId}` }),
+    ]);
+    await ws.deleteOne();
+    req.app.get("io")?.to(`workspace:${ws._id}`).emit("workspace:deleted", { id: String(ws._id) });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Delete workspace error:", err.message);
+    res.status(500).json({ message: "Server error deleting workspace" });
   }
 });
 

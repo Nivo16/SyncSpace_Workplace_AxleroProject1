@@ -11,6 +11,7 @@ import { workspaceApi, interviewsApi, recordingsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getWorkspacePath } from '../types/workspace';
+import { deleteWorkspaceData, getWorkspaceStatus } from '../data/workspaceStore';
 
 export const Dashboard = ({ readOnly = false }) => {
   const navigate = useNavigate();
@@ -82,7 +83,20 @@ export const Dashboard = ({ readOnly = false }) => {
     }
   };
 
-  const activeWorkspaces = workspaces.filter((workspace) => workspace.status === 'Active').length;
+  const handleDeleteWorkspace = async (workspace) => {
+    try {
+      await workspaceApi.remove(workspace.id);
+      deleteWorkspaceData(workspace.id);
+      setWorkspaces((current) => current.filter((item) => item.id !== workspace.id));
+      setWorkspaceToEdit(null);
+      showToast('Workspace deleted', 'success');
+    } catch (err) {
+      showToast(err.message || 'Could not delete workspace', 'error');
+      throw err;
+    }
+  };
+
+  const activeWorkspaces = workspaces.filter((workspace) => getWorkspaceStatus(workspace) === 'Active').length;
   const collaboratorTotal = workspaces.reduce((total, workspace) => total + (workspace.collaborators || 0), 0);
   const activeInterviews = interviews.filter((iv) => iv.status === 'active').length;
 
@@ -131,7 +145,7 @@ export const Dashboard = ({ readOnly = false }) => {
         <>
           <CreateWorkspaceModal isOpen={createModalOpen} onClose={() => setCreateModalOpen(false)} onCreate={handleCreateWorkspace} />
           <JoinWorkspaceModal isOpen={joinModalOpen} onClose={() => setJoinModalOpen(false)} onJoin={handleJoinWorkspace} />
-          <EditWorkspaceModal workspace={workspaceToEdit} onClose={() => setWorkspaceToEdit(null)} onSave={handleUpdateWorkspace} />
+          <EditWorkspaceModal key={workspaceToEdit?.id || 'closed'} workspace={workspaceToEdit} onClose={() => setWorkspaceToEdit(null)} onSave={handleUpdateWorkspace} onDelete={handleDeleteWorkspace} />
         </>
       )}
     </DashboardLayout>

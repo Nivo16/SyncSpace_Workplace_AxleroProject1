@@ -2,6 +2,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState } from 'react';
 import { WorkspaceCard } from './WorkspaceCard';
 import { EmptyState } from './EmptyState';
+import { getWorkspaceStatus } from '../../data/workspaceStore';
 import { ArrowRight, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 export const WorkspaceGrid = ({ workspaces, onCreateWorkspace, onEditWorkspace, searchQuery = '', readOnly = false, }) => {
@@ -13,7 +14,7 @@ export const WorkspaceGrid = ({ workspaces, onCreateWorkspace, onEditWorkspace, 
         if (!matchesSearch)
             return false;
         if (activeFilter === 'Active')
-            return ws.status === 'Active';
+            return getWorkspaceStatus(ws) === 'Active';
         if (activeFilter === 'Code Editor')
             return ws.type === 'Code Editor' || ws.type === 'Code + Whiteboard';
         if (activeFilter === 'Whiteboard')

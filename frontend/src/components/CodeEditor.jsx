@@ -197,7 +197,6 @@ function CodeEditor({ workspaceId, roomId, onActivity }) {
       const { file } = await workspaceFilesApi.create(workspaceId, { name, kind: 'folder', parentPath });
       setItems((prev) => [...prev, file]);
       setExpanded((prev) => ({ ...prev, [file.path]: true, [parentPath]: true }));
-      onActivity?.(`Created folder ${file.path}`, 'code');
       showToast(`Folder “${file.name}” created`, 'success');
     } catch (err) { showToast(err.message || 'Could not create folder', 'error'); }
   };
@@ -209,7 +208,6 @@ function CodeEditor({ workspaceId, roomId, onActivity }) {
       const { file } = await workspaceFilesApi.create(workspaceId, { name, kind: 'file', parentPath, language: languageFromName(name), content: '' });
       setItems((prev) => [...prev, file]);
       setActiveId(file.id); setCode(''); setExpanded((prev) => ({ ...prev, [parentPath]: true }));
-      onActivity?.(`Created file ${file.path}`, 'code');
       showToast(`File “${file.name}” created`, 'success');
     } catch (err) { showToast(err.message || 'Could not create file', 'error'); }
   };
@@ -220,7 +218,6 @@ function CodeEditor({ workspaceId, roomId, onActivity }) {
     try {
       const { file } = await workspaceFilesApi.update(workspaceId, activeFile.id, { content: code });
       setItems((prev) => prev.map((x) => x.id === file.id ? file : x));
-      onActivity?.(`Saved ${file.path}`, 'code');
       showToast(`Saved ${file.name}`, 'success');
     } catch (err) { showToast(err.message || 'Could not save file', 'error'); }
     finally { setSaving(false); }
@@ -260,7 +257,6 @@ function CodeEditor({ workspaceId, roomId, onActivity }) {
         const next = files.find((x) => x.id !== item.id && !String(x.path).startsWith(`${item.path}/`));
         setActiveId(next?.id || null); setCode(next?.content || '');
       }
-      onActivity?.(`Deleted ${item.path}`, 'code');
       showToast(`${item.kind === 'folder' ? 'Folder' : 'File'} deleted`, 'success');
     } catch (err) { showToast(err.message || 'Could not delete item', 'error'); }
   };
@@ -328,7 +324,7 @@ function CodeEditor({ workspaceId, roomId, onActivity }) {
           <div className={`editor-output ${runStatus} ${activeFile?.language === 'python' ? 'has-stdin' : ''}`}>
             <div className="output-header"><div><Terminal /> Terminal</div><button type="button" onClick={() => { setOutput(''); setRunStatus('idle'); }} title="Clear terminal"><X /></button></div>
             {activeFile?.language === 'python' && <label className="program-input"><span>Program input · one response per line</span><textarea value={stdin} onChange={(event) => setStdin(event.target.value)} placeholder={'Calculator example: enter each response on a new line\n1\n8\n2\n7'} spellCheck="false" /></label>}
-            <pre className="output-content">{output || 'Run your JavaScript or HTML file to see output here.'}</pre>
+            <pre className="output-content">{output || 'Run a JavaScript, Python, or HTML file to see output here.'}</pre>
           </div>
         </section>
       </div>

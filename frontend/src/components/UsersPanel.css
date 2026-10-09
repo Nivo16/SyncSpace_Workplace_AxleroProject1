@@ -62,6 +62,34 @@
   font-weight: 700;
 }
 
+.member-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: 12px;
+}
+
+.member-actions select,
+.member-actions button {
+  min-height: 32px;
+  border: 1px solid #26364d;
+  border-radius: 7px;
+  background: #09101d;
+  color: #cbd5e1;
+  padding: 0 9px;
+  font-size: 11px;
+}
+
+.member-actions button {
+  cursor: pointer;
+  border-color: rgba(244, 63, 94, .35);
+  color: #fda4af;
+}
+
+.member-actions button:hover {
+  background: rgba(244, 63, 94, .12);
+}
+
 /* =========================
    USER LIST
 ========================= */
@@ -190,4 +218,16 @@
 
 .user-status.offline .status-dot {
   background: #94a3b8;
+}
+
+@media (max-width: 700px) {
+  .user-card {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .member-actions {
+    width: 100%;
+    margin-left: 55px;
+  }
 }

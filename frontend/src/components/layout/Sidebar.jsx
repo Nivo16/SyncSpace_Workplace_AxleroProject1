@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, FolderKanban, History, Layers, Zap, X, Video, ShieldCheck, ScrollText, PlaySquare, UserCircle, LogOut } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Layers, Zap, X, Video, ShieldCheck, ScrollText, PlaySquare, UserCircle, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const Sidebar = ({ mobileOpen, setMobileOpen }) => {
@@ -11,7 +11,6 @@ export const Sidebar = ({ mobileOpen, setMobileOpen }) => {
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Workspaces', path: '/workspaces', icon: FolderKanban },
     { name: 'Interviews', path: '/interviews', icon: Video },
-    { name: 'Recent Sessions', path: '/sessions', icon: History },
     { name: 'Activity History', path: '/audit-logs', icon: ScrollText },
     ...(role === 'admin' || role === 'interviewer' ? [{ name: 'Recordings', path: '/recordings', icon: PlaySquare }] : []),
     ...(role === 'admin' ? [{ name: 'Admin', path: '/admin', icon: ShieldCheck }] : []),

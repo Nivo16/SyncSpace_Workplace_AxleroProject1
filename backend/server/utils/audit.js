@@ -18,4 +18,11 @@ async function writeAudit(req, action, entityType = "", entityId = "", details =
   }
 }
 
-module.exports = { writeAudit };
+async function broadcastWorkspaceActivity(req, workspace, entry) {
+  if (!entry) return null;
+  await entry.populate("actor", "name email role");
+  req.app.get("io")?.to(`workspace:${workspace._id}`).emit("workspace:activity", entry);
+  return entry;
+}
+
+module.exports = { writeAudit, broadcastWorkspaceActivity };

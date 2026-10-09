@@ -15,6 +15,7 @@ const recordingRoutes = require("./routes/recordings");
 const workspaceFileRoutes = require("./routes/workspaceFiles");
 const { YSocketIO } = require("y-socket.io/dist/server");
 const YjsDocument = require("./models/YjsDocument");
+const Workspace = require("./models/Workspace");
 
 const app = express();
 app.use(cors());
@@ -119,9 +120,33 @@ io.on("connection", (socket) => {
   console.log(`User connected: ${socket.id}`);
   socket.emit("connected", { socketId: socket.id, user: socket.data.user || null });
 
-  socket.on("join-workspace", (workspaceId) => {
+  socket.on("join-workspace", async (workspaceId) => {
     if (!workspaceId) return;
+    const user = socket.data.user;
+    if (!user) {
+      socket.emit("workspace:access-denied", { workspaceId });
+      return;
+    }
+    try {
+      const workspace = await Workspace.findById(workspaceId).select("owner collaborators.user");
+      const isMember = workspace && (
+        String(workspace.owner) === String(user.userId) ||
+        workspace.collaborators.some((member) => String(member.user) === String(user.userId)) ||
+        user.role === "admin"
+      );
+      if (!isMember) {
+        socket.emit("workspace:access-denied", { workspaceId });
+        return;
+      }
+    } catch (err) {
+      socket.emit("workspace:access-denied", { workspaceId });
+      return;
+    }
     socket.join(`workspace:${workspaceId}`);
+  });
+
+  socket.on("leave-workspace", (workspaceId) => {
+    if (workspaceId) socket.leave(`workspace:${workspaceId}`);
   });
 
   socket.on("join-room", (roomId) => {

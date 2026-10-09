@@ -8,7 +8,7 @@
 
   background: #09101d;
 
-  color: #111827;
+  color: #e2e8f0;
 
   overflow-y: auto;
 }
@@ -26,7 +26,7 @@
 
   margin-bottom: 20px;
 
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #26364d;
 }
 
 .history-header h2 {
@@ -35,7 +35,7 @@
   font-size: 22px;
   font-weight: 600;
 
-  color: #1e293b;
+  color: #e2e8f0;
 }
 
 .history-header p {
@@ -153,7 +153,61 @@
 
   font-weight: 600;
 
-  color: #1e293b;
+  color: #cbd5e1;
+}
+
+.contributors-section,
+.history-section {
+  margin-bottom: 24px;
+}
+
+.contributors-section h3,
+.history-section h3 {
+  margin: 0 0 12px;
+  color: #67e8f9;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.contributors-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.contributor-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #26364d;
+  border-radius: 8px;
+  background: #0f1a2c;
+}
+
+.contributor-avatar {
+  display: flex;
+  width: 27px;
+  height: 27px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #164e63;
+  color: #a5f3fc;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.contributor-name {
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.contributor-count {
+  color: #64748b;
+  font-size: 10px;
 }
 
 .history-time {

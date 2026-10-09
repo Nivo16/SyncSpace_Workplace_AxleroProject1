@@ -10,10 +10,12 @@ import { workspaceApi } from '../api/client';
 import { getWorkspacePath } from '../types/workspace';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import { deleteWorkspaceData } from '../data/workspaceStore';
 
 export const WorkspacesPage = () => {
   const navigate = useNavigate();
+  const { role } = useAuth();
   const { showToast } = useToast();
   const [workspaces, setWorkspaces] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -85,7 +87,11 @@ export const WorkspacesPage = () => {
           <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">All Workspaces <Zap className="w-5 h-5 text-cyan-400" /></h2>
           <p className="text-sm text-slate-400">Live workspaces stored in MongoDB with secure share links.</p>
         </div>
-        <div className="flex flex-wrap gap-2"><Button variant="outline" icon={<Link2 className="w-4 h-4" />} onClick={() => setJoinModalOpen(true)}>Join Workspace</Button><Button variant="thunder" icon={<Plus className="w-4 h-4" />} onClick={() => setCreateModalOpen(true)}>Create Workspace</Button></div>
+        <div className="flex flex-wrap gap-2">
+          {role === 'user' && <Button variant="outline" icon={<Link2 className="w-4 h-4" />} onClick={() => navigate('/interviews/join')}>Join Interview</Button>}
+          <Button variant="outline" icon={<Link2 className="w-4 h-4" />} onClick={() => setJoinModalOpen(true)}>Join Workspace</Button>
+          <Button variant="thunder" icon={<Plus className="w-4 h-4" />} onClick={() => setCreateModalOpen(true)}>Create Workspace</Button>
+        </div>
       </div>
       {loading ? <div className="py-16 text-center text-slate-500">Loading your workspaces…</div> : loadError ? <div className="py-16 text-center"><p className="mb-4 text-sm text-rose-300">{loadError}</p><Button variant="outline" icon={<RefreshCw className="w-4 h-4" />} onClick={() => setReloadKey((key) => key + 1)}>Try again</Button></div> : <WorkspaceGrid workspaces={workspaces} onCreateWorkspace={() => setCreateModalOpen(true)} onEditWorkspace={setWorkspaceToEdit} searchQuery={searchQuery} />}
       <JoinWorkspaceModal isOpen={joinModalOpen} onClose={() => setJoinModalOpen(false)} onJoin={handleJoinWorkspace} />

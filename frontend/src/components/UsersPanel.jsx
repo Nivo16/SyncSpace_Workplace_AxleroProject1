@@ -1,21 +1,13 @@
-import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import "./UsersPanel.css";
 
-function UsersPanel({ workspace, onAddUser }) {
-  const [name, setName] = useState("");
+function UsersPanel({ workspace, canManage, onRoleChange, onRemoveUser }) {
+  const { user: currentUser } = useAuth();
   const storedUsers = workspace.collaboratorList || [];
-  const users = storedUsers.some((user) => user.role === "Owner") ? storedUsers : [
-    { id: "owner", name: workspace.owner || "You", role: "Owner", status: "online" },
-    ...storedUsers,
-  ];
-
-  const handleAdd = (event) => {
-    event.preventDefault();
-    const trimmedName = name.trim();
-    if (!trimmedName) return;
-    onAddUser({ id: `${Date.now()}`, name: trimmedName, role: "Member", status: "online" });
-    setName("");
-  };
+  const hasCreator = storedUsers.some((user) => String(user.id) === String(workspace.owner));
+  const users = hasCreator || !workspace.ownerName
+    ? storedUsers
+    : [{ id: workspace.owner, name: workspace.ownerName, role: "owner" }, ...storedUsers];
 
   return (
     <div className="users-panel">
@@ -24,49 +16,55 @@ function UsersPanel({ workspace, onAddUser }) {
         <span>{users.length} collaborators</span>
       </div>
 
-      <form className="add-user-form" onSubmit={handleAdd}>
-        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Add collaborator by name" aria-label="Collaborator name" />
-        <button type="submit">Add user</button>
-      </form>
-
       <div className="users-list">
-        {users.map((user) => (
-          <div className="user-card" key={user.id}>
+        {users.map((workspaceUser) => {
+          const isCreator = String(workspaceUser.id) === String(workspace.owner);
+          const isOwner = workspaceUser.role?.toLowerCase() === "owner";
+          return (
+            <div className="user-card" key={workspaceUser.id}>
             <div className="user-avatar">
-              {user.name.charAt(0)}
+              {workspaceUser.name.charAt(0)}
             </div>
 
             <div className="user-info">
               <div className="user-name">
-                {user.name}
+                {workspaceUser.name}
 
-                {user.role === "Owner" && (
+                {(isCreator || isOwner) && (
                   <span className="you-label">
-                    You
+                    {isCreator ? "Creator" : "Owner"}
                   </span>
                 )}
               </div>
 
               <div className="user-role">
-                {user.role}
+                {isCreator ? "Creator" : isOwner ? "Owner" : "Member"}
               </div>
             </div>
 
-            <div
-              className={`user-status ${
-                  user.status !== "offline"
-                  ? "online"
-                  : "offline"
-              }`}
-            >
+            <div className="user-status online">
               <span className="status-dot"></span>
 
-              {user.status !== "offline"
-                ? "Online"
-                : "Offline"}
+              {String(workspaceUser.id) === String(currentUser?.id || currentUser?._id) ? "You" : "Member"}
             </div>
-          </div>
-        ))}
+            {canManage && !isCreator && (
+              <div className="member-actions">
+                <select
+                  aria-label={`Role for ${workspaceUser.name}`}
+                  value={isOwner ? "owner" : "member"}
+                  onChange={(event) => onRoleChange(workspaceUser, event.target.value)}
+                >
+                  <option value="member">Member</option>
+                  <option value="owner">Owner access</option>
+                </select>
+                <button type="button" onClick={() => onRemoveUser(workspaceUser)} aria-label={`Remove ${workspaceUser.name}`}>
+                  Remove
+                </button>
+              </div>
+            )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

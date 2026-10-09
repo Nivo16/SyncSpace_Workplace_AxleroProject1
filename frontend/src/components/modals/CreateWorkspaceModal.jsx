@@ -3,10 +3,15 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Code2, Palette, Layers, Monitor, Mic } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { WorkspaceKind } from '../../types/workspace';
 import { getCurrentUserName } from '../../data/currentUser';
+import { useNavigate } from 'react-router-dom';
 
 export const CreateWorkspaceModal = ({ isOpen, onClose, onCreate }) => {
+  const { role } = useAuth();
+  const navigate = useNavigate();
+  const canCreateInterviews = role === 'interviewer' || role === 'admin';
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [kind, setKind] = useState(WorkspaceKind.GENERAL);
@@ -58,12 +63,12 @@ export const CreateWorkspaceModal = ({ isOpen, onClose, onCreate }) => {
       desc: 'Normal collaborative work with whiteboard and code editor.',
       icon: <Monitor className="w-4 h-4 text-cyan-400" />,
     },
-    {
+    ...(canCreateInterviews ? [{
       kind: WorkspaceKind.INTERVIEW,
       label: 'Interview Workspace',
       desc: 'Conduct a technical interview with a candidate.',
       icon: <Mic className="w-4 h-4 text-violet-300" />,
-    },
+    }] : []),
   ];
 
   const typesConfig = [
@@ -92,7 +97,7 @@ export const CreateWorkspaceModal = ({ isOpen, onClose, onCreate }) => {
       isOpen={isOpen}
       onClose={onClose}
       title="Create New Workspace"
-      subtitle="Choose a general room or an interview workspace."
+      subtitle={canCreateInterviews ? 'Choose a general room or an interview workspace.' : 'Create a general collaborative workspace.'}
       maxWidth="md"
     >
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -211,6 +216,11 @@ export const CreateWorkspaceModal = ({ isOpen, onClose, onCreate }) => {
         )}
 
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+          {!canCreateInterviews && (
+            <Button type="button" variant="outline" onClick={() => { onClose(); navigate('/interviews/join'); }}>
+              Join Interview
+            </Button>
+          )}
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>

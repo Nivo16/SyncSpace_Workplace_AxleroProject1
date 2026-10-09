@@ -17,7 +17,10 @@ export const EditWorkspaceModal = ({ workspace, onClose, onSave, onDelete }) => 
     const [deleting, setDeleting] = useState(false);
     const { showToast } = useToast();
     const { user, role } = useAuth();
-    const canDelete = role === 'admin' || String(workspace?.owner) === String(user?.id || user?._id);
+    const currentUserId = user?.id || user?._id;
+    const canManage = role === 'admin' || String(workspace?.owner) === String(currentUserId) ||
+        (workspace?.collaboratorList || []).some((member) => String(member.id) === String(currentUserId) && member.role === 'owner');
+    const canDelete = canManage;
 
     const handleSubmit = (event) => {
         event.preventDefault();
@@ -81,7 +84,7 @@ export const EditWorkspaceModal = ({ workspace, onClose, onSave, onDelete }) => 
                     {onDelete && canDelete ? <Button type="button" variant="danger" icon={<Trash2 className="h-4 w-4" />} onClick={handleDelete} disabled={deleting}>{deleting ? 'Deleting…' : 'Delete Workspace'}</Button> : <span />}
                     <div className="ml-auto flex gap-3">
                         <Button type="button" variant="outline" onClick={onClose} disabled={deleting}>Cancel</Button>
-                        <Button type="submit" variant="thunder" disabled={deleting}>Save Changes</Button>
+                        {canManage && <Button type="submit" variant="thunder" disabled={deleting}>Save Changes</Button>}
                     </div>
                 </div>
             </form>

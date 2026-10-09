@@ -6,7 +6,6 @@ import { ToastContainer } from './components/ui/Toast';
 import { ProtectedRoute, RoleRoute } from './components/auth/ProtectedRoute';
 import { Dashboard } from './pages/Dashboard';
 import { WorkspacesPage } from './pages/WorkspacesPage';
-import { SessionsPage } from './pages/SessionsPage';
 import { WorkspacePage } from './pages/Workspace';
 import JoinWorkspacePage from './pages/JoinWorkspacePage';
 import { InterviewWorkspacePage } from './features/interview/pages/InterviewWorkspace';
@@ -44,7 +43,7 @@ export function App() {
               <Route path="/workspaces" element={<ProtectedRoute><WorkspacesPage /></ProtectedRoute>} />
               <Route path="/workspaces/join" element={<ProtectedRoute><JoinWorkspacePage /></ProtectedRoute>} />
               <Route path="/workspaces/:id" element={<ProtectedRoute><WorkspacePage /></ProtectedRoute>} />
-              <Route path="/sessions" element={<ProtectedRoute><SessionsPage /></ProtectedRoute>} />
+              <Route path="/sessions" element={<Navigate to="/audit-logs" replace />} />
               <Route path="/audit-logs" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
               <Route path="/recordings" element={<RoleRoute roles={["admin", "interviewer"]}><RecordingsPage /></RoleRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />

@@ -69,9 +69,13 @@ export const interviewsApi = {
 export const workspaceApi = {
     list: () => authRequest('/workspaces'),
     get: (id) => authRequest(`/workspaces/${id}`),
+    getActivity: (id) => authRequest(`/workspaces/${id}/activity`),
+    recordActivity: (id, action, source) => authRequest(`/workspaces/${id}/activity`, { method: 'POST', body: JSON.stringify({ action, source }) }),
     findByCode: (code) => authRequest(`/workspaces/code/${encodeURIComponent(code)}`),
     create: (payload) => authRequest('/workspaces', { method: 'POST', body: JSON.stringify(payload) }),
     join: (code) => authRequest(`/workspaces/${encodeURIComponent(code)}/join`, { method: 'POST' }),
+    updateMember: (id, memberId, role) => authRequest(`/workspaces/${id}/members/${encodeURIComponent(memberId)}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+    removeMember: (id, memberId) => authRequest(`/workspaces/${id}/members/${encodeURIComponent(memberId)}`, { method: 'DELETE' }),
     update: (id, payload) => authRequest(`/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
     remove: (id) => authRequest(`/workspaces/${id}`, { method: 'DELETE' }),
 };

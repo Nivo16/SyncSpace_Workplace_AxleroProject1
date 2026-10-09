@@ -1,34 +1,74 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Code2, Palette, Layers, Users, Clock, ArrowRight, Pencil, Mic } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { getWorkspacePath, isInterviewWorkspace } from '../../types/workspace';
 import { getInterviewRecord, getWorkspaceStatus } from '../../data/workspaceStore';
+import { useAuth } from '../../context/AuthContext';
+
 export const WorkspaceCard = ({ workspace: sourceWorkspace, onEdit, readOnly = false }) => {
     const navigate = useNavigate();
+    const { user, role } = useAuth();
     const workspace = { ...sourceWorkspace };
     const interview = isInterviewWorkspace(workspace);
     const interviewRecord = interview ? getInterviewRecord(workspace.id) : null;
+    const userId = user?.id || user?._id;
+    const canManage = role === 'admin' || String(workspace.owner) === String(userId) ||
+        (workspace.collaboratorList || []).some((member) => String(member.id) === String(userId) && member.role === 'owner');
     const getTypeIcon = (type) => {
-        if (interview) return _jsx(Mic, { className: "w-4 h-4 text-violet-300" });
+        if (interview) return <Mic className="w-4 h-4 text-violet-300" />;
         switch (type) {
             case 'Code Editor':
-                return _jsx(Code2, { className: "w-4 h-4 text-cyan-400" });
+                return <Code2 className="w-4 h-4 text-cyan-400" />;
             case 'Whiteboard':
-                return _jsx(Palette, { className: "w-4 h-4 text-purple-400" });
+                return <Palette className="w-4 h-4 text-purple-400" />;
             case 'Code + Whiteboard':
-                return _jsx(Layers, { className: "w-4 h-4 text-indigo-400" });
+                return <Layers className="w-4 h-4 text-indigo-400" />;
             default:
-                return _jsx(Layers, { className: "w-4 h-4 text-cyan-400" });
+                return <Layers className="w-4 h-4 text-cyan-400" />;
         }
     };
     const interviewStatus = interviewRecord?.status || 'scheduled';
     const status = getWorkspaceStatus(workspace);
     workspace.status = status;
     const isOnline = status === 'Active';
-    return (_jsxs("div", { className: "electric-card rounded-2xl p-5 flex flex-col justify-between group", children: [_jsxs("div", { children: [_jsxs("div", { className: "flex items-start justify-between gap-3 mb-3", children: [_jsxs("div", { className: "flex items-center gap-3", children: [_jsx("div", { className: `w-10 h-10 rounded-xl bg-slate-900 border flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-md ${interview ? 'border-violet-400/40 shadow-violet-950' : 'border-cyan-500/30 shadow-cyan-950'}`, children: getTypeIcon(workspace.type) }), _jsxs("div", { children: [_jsx("h3", { className: "font-bold text-base text-slate-100 group-hover:text-cyan-300 transition-colors line-clamp-1", children: workspace.name }), _jsx("span", { className: "text-[11px] text-cyan-400 font-mono", children: workspace.code || `SYNC-${workspace.id}` })] })] }), _jsxs("div", { className: `
-            flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border shrink-0
-            ${isOnline ? 'bg-cyan-950/80 border-cyan-500/50 text-cyan-300 shadow-sm shadow-cyan-500/30' : 'bg-slate-900 border-slate-800 text-slate-400'}
-          `, children: [_jsx("span", { className: `w-2 h-2 rounded-full ${isOnline ? 'bg-cyan-400 animate-pulse' : 'bg-slate-500'}` }), _jsx("span", { children: workspace.status })] })] }), interview && (_jsxs("div", { className: "mb-3 flex items-center gap-2", children: [_jsx("span", { className: "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border border-violet-400/40 bg-violet-950/50 text-violet-200", children: "Interview" }), _jsx("span", { className: "text-[10px] font-medium text-slate-400 capitalize", children: interviewStatus })] })), _jsx("p", { className: "text-xs text-slate-400 leading-relaxed mb-4 line-clamp-2 min-h-[36px]", children: workspace.description }), workspace.tags && workspace.tags.length > 0 && (_jsx("div", { className: "flex flex-wrap gap-1.5 mb-4", children: workspace.tags.map((tag) => (_jsx("span", { className: "text-[10px] font-medium bg-slate-900 text-cyan-200 px-2 py-0.5 rounded-md border border-cyan-500/20", children: tag }, tag))) }))] }), _jsxs("div", { className: "pt-4 border-t border-slate-800/80 space-y-4", children: [_jsxs("div", { className: "flex items-center justify-between text-xs text-slate-400", children: [_jsxs("div", { className: "flex items-center gap-1.5", children: [getTypeIcon(workspace.type), _jsx("span", { className: "font-medium text-slate-300", children: interview ? 'Interview Workspace' : workspace.type })] }), _jsxs("div", { className: "flex items-center gap-1.5", children: [_jsx(Users, { className: "w-3.5 h-3.5 text-slate-400" }), _jsxs("span", { children: [workspace.collaborators, " collaborators"] })] })] }), _jsxs("div", { className: "flex items-center justify-between gap-2 pt-1", children: [_jsxs("div", { className: "flex items-center gap-1 text-[11px] text-slate-400", children: [_jsx(Clock, { className: "w-3 h-3" }), _jsxs("span", { children: ["Updated ", workspace.lastUpdated] })] }), _jsxs(Button, { variant: "outline", size: "sm", onClick: () => navigate(getWorkspacePath(workspace)), className: "group-hover:bg-cyan-500 group-hover:text-slate-950 group-hover:border-cyan-400 transition-all duration-200 font-bold", children: [_jsx("span", { children: interview ? 'Open Interview' : 'Open Workspace' }), _jsx(ArrowRight, { className: "w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" })] }), !readOnly && (_jsxs("button", { type: "button", onClick: () => onEdit(workspace), className: "inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-500/50 hover:text-cyan-300", title: `Edit ${workspace.name}`, children: [_jsx(Pencil, { className: "h-3.5 w-3.5" }), "Edit"] }))] })] })] }));
+    const updated = workspace.lastUpdated || (workspace.updatedAt ? new Date(workspace.updatedAt).toLocaleDateString() : 'Recently');
+
+    return (
+        <article className="electric-card group flex flex-col justify-between rounded-2xl p-5">
+            <div>
+                <div className="mb-3 flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-slate-900 shadow-md transition-transform group-hover:scale-110 ${interview ? 'border-violet-400/40 shadow-violet-950' : 'border-cyan-500/30 shadow-cyan-950'}`}>
+                            {getTypeIcon(workspace.type)}
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="line-clamp-1 text-base font-bold text-slate-100 transition-colors group-hover:text-cyan-300">{workspace.name}</h3>
+                            <span className="font-mono text-[11px] text-cyan-400">{workspace.code || `SYNC-${workspace.id}`}</span>
+                        </div>
+                    </div>
+                    <span className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${isOnline ? 'border-cyan-500/50 bg-cyan-950/80 text-cyan-300' : 'border-slate-800 bg-slate-900 text-slate-400'}`}>
+                        <span className={`h-2 w-2 rounded-full ${isOnline ? 'animate-pulse bg-cyan-400' : 'bg-slate-500'}`} />{workspace.status}
+                    </span>
+                </div>
+                {interview && <div className="mb-3 flex items-center gap-2"><span className="rounded-md border border-violet-400/40 bg-violet-950/50 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-200">Interview</span><span className="text-[10px] capitalize text-slate-400">{interviewStatus}</span></div>}
+                <p className="mb-4 line-clamp-2 min-h-9 text-xs leading-relaxed text-slate-400">{workspace.description}</p>
+                {workspace.tags?.length > 0 && <div className="mb-4 flex flex-wrap gap-1.5">{workspace.tags.map((tag) => <span key={tag} className="rounded-md border border-cyan-500/20 bg-slate-900 px-2 py-0.5 text-[10px] font-medium text-cyan-200">{tag}</span>)}</div>}
+            </div>
+            <div className="space-y-4 border-t border-slate-800/80 pt-4">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                    <div className="flex items-center gap-1.5">{getTypeIcon(workspace.type)}<span className="font-medium text-slate-300">{interview ? 'Interview Workspace' : workspace.type}</span></div>
+                    <div className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /><span>{workspace.collaborators || 0} collaborators</span></div>
+                </div>
+                <div className="flex items-center justify-between gap-2 pt-1">
+                    <div className="flex items-center gap-1 text-[11px] text-slate-400"><Clock className="h-3 w-3" /><span>Updated {updated}</span></div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => navigate(getWorkspacePath(workspace))} className="font-bold transition-all group-hover:border-cyan-400 group-hover:bg-cyan-500 group-hover:text-slate-950">
+                            {interview ? 'Open Interview' : 'Open Workspace'}<ArrowRight className="h-3.5 w-3.5" />
+                        </Button>
+                        {!readOnly && canManage && onEdit && <button type="button" onClick={() => onEdit(workspace)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-500/50 hover:text-cyan-300" title={`Edit ${workspace.name}`}><Pencil className="h-3.5 w-3.5" />Edit</button>}
+                    </div>
+                </div>
+            </div>
+        </article>
+    );
 };

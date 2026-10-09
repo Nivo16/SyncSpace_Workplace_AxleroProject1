@@ -2,7 +2,7 @@ const express = require('express');
 const Workspace = require('../models/Workspace');
 const WorkspaceFile = require('../models/WorkspaceFile');
 const { requireAuth } = require('../middleware/auth');
-const { writeAudit } = require('../utils/audit');
+const { writeAudit, broadcastWorkspaceActivity } = require('../utils/audit');
 
 const router = express.Router({ mergeParams: true });
 
@@ -38,7 +38,8 @@ router.post('/', requireAuth, async (req, res) => {
     const exists = await WorkspaceFile.findOne({ workspace: ws._id, path });
     if (exists) return res.status(409).json({ message: 'A file or folder with that name already exists' });
     const file = await WorkspaceFile.create({ workspace: ws._id, name, path, kind, parentPath, language: kind === 'file' ? (req.body.language || 'plaintext') : 'plaintext', content: kind === 'file' ? String(req.body.content || '') : '' });
-    await writeAudit(req, 'workspace.file.created', 'workspace', ws._id, { path, kind });
+    const activity = await writeAudit(req, 'workspace.file.created', 'workspace', ws._id, { path, kind });
+    await broadcastWorkspaceActivity(req, ws, activity);
     res.status(201).json({ file: serialize(file) });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Server error creating project item' }); }
 });
@@ -55,7 +56,8 @@ router.patch('/:fileId', requireAuth, async (req, res) => {
     if (req.body.language !== undefined) file.language = String(req.body.language);
     if (req.body.content !== undefined && file.kind === 'file') file.content = String(req.body.content);
     await file.save();
-    await writeAudit(req, 'workspace.file.updated', 'workspace', ws._id, { path: file.path });
+    const activity = await writeAudit(req, 'workspace.file.updated', 'workspace', ws._id, { path: file.path });
+    await broadcastWorkspaceActivity(req, ws, activity);
     res.json({ file: serialize(file) });
     const io = req.app.get('io'); io?.to(`workspace:${ws._id}`).emit('workspace:file-updated', serialize(file));
   } catch (err) { console.error(err); res.status(500).json({ message: 'Server error updating project item' }); }
@@ -68,7 +70,8 @@ router.delete('/:fileId', requireAuth, async (req, res) => {
     if (!file) return res.status(404).json({ message: 'Project item not found' });
     const prefix = `${file.path}/`;
     await WorkspaceFile.deleteMany({ workspace: ws._id, $or: [{ _id: file._id }, { path: { $regex: `^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}` } }] });
-    await writeAudit(req, 'workspace.file.deleted', 'workspace', ws._id, { path: file.path });
+    const activity = await writeAudit(req, 'workspace.file.deleted', 'workspace', ws._id, { path: file.path });
+    await broadcastWorkspaceActivity(req, ws, activity);
     const io = req.app.get('io'); io?.to(`workspace:${ws._id}`).emit('workspace:file-deleted', { id: String(file._id), path: file.path });
     res.json({ ok: true });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Server error deleting project item' }); }

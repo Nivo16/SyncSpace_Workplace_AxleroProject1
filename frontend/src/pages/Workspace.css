@@ -62,6 +62,15 @@
   display: block;
 }
 
+[data-theme="light"] .workspace {
+  background: linear-gradient(145deg, #f6f8f6, #eef4f1);
+  color: #203238;
+}
+
+[data-theme="light"] .workspace-main {
+  background: #e1e9e5;
+}
+
 @media (max-width: 760px) {
   .workspace-header {
     padding: 0 12px;

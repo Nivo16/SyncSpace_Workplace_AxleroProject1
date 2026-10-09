@@ -5,7 +5,7 @@ import { Header } from './Header';
 export const DashboardLayout = ({ children, title = 'Dashboard', searchQuery, setSearchQuery }) => {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased relative">
+    <div className="app-shell min-h-screen antialiased relative">
       <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       <div className="min-h-screen flex flex-col min-w-0 lg:ml-64">
         <Header 

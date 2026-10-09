@@ -3,8 +3,8 @@ const AuditLog = require("../models/AuditLog");
 async function writeAudit(req, action, entityType = "", entityId = "", details = {}) {
   try {
     return await AuditLog.create({
-      actor: req.user?.userId || null,
-      actorName: req.user?.name || req.user?.email || "",
+      actor: req.user?.guest ? null : req.user?.userId || null,
+      actorName: req.user?.guest ? `${req.user.name} (guest)` : req.user?.name || req.user?.email || "",
       actorRole: req.user?.role || "",
       action,
       entityType,

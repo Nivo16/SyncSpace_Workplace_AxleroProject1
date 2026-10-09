@@ -1,5 +1,6 @@
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getGuestSession } from '../../api/client';
 
 /** Full-page loading state while a stored token is being validated. */
 function AuthLoading() {
@@ -20,6 +21,18 @@ export function ProtectedRoute({ children }) {
     return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   }
   return children;
+}
+
+/** Signed-in users, or a guest holding a session for this exact workspace (route param `id`). */
+export function WorkspaceRoute({ children }) {
+  const location = useLocation();
+  const { id } = useParams();
+  const { isAuthenticated, status } = useAuth();
+
+  if (status === 'loading') return <AuthLoading />;
+  const guest = getGuestSession();
+  if (isAuthenticated || (guest && String(guest.workspaceId) === String(id))) return children;
+  return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} replace />;
 }
 
 /**

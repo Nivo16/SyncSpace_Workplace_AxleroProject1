@@ -17,6 +17,7 @@ function HistoryPanel({ entries = [] }) {
     if (entry.action === "workspace.file.updated") return `Updated ${path || "a file"}`;
     if (entry.action === "workspace.file.deleted") return `Deleted ${path || "a file"}`;
     if (entry.action === "workspace.joined") return "Joined the workspace";
+    if (entry.action === "workspace.guest_joined") return "Joined as a guest";
     if (entry.action === "workspace.member.role_changed") return `Changed ${entry.details?.memberName || "a member"}'s access to ${entry.details?.role || "member"}`;
     if (entry.action === "workspace.member.removed") return `Removed ${entry.details?.memberName || "a workspace member"}`;
     return String(entry.action || "Workspace activity").replace(/^workspace\./, "").replace(/[._]/g, " ");

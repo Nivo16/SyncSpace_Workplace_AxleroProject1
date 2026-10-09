@@ -3,7 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastContainer } from './components/ui/Toast';
-import { ProtectedRoute, RoleRoute } from './components/auth/ProtectedRoute';
+import { ProtectedRoute, RoleRoute, WorkspaceRoute } from './components/auth/ProtectedRoute';
 import { Dashboard } from './pages/Dashboard';
 import { WorkspacesPage } from './pages/WorkspacesPage';
 import { WorkspacePage } from './pages/Workspace';
@@ -41,8 +41,8 @@ export function App() {
               {/* Any authenticated user */}
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/workspaces" element={<ProtectedRoute><WorkspacesPage /></ProtectedRoute>} />
-              <Route path="/workspaces/join" element={<ProtectedRoute><JoinWorkspacePage /></ProtectedRoute>} />
-              <Route path="/workspaces/:id" element={<ProtectedRoute><WorkspacePage /></ProtectedRoute>} />
+              <Route path="/workspaces/join" element={<JoinWorkspacePage />} />
+              <Route path="/workspaces/:id" element={<WorkspaceRoute><WorkspacePage /></WorkspaceRoute>} />
               <Route path="/sessions" element={<Navigate to="/audit-logs" replace />} />
               <Route path="/audit-logs" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
               <Route path="/recordings" element={<RoleRoute roles={["admin", "interviewer"]}><RecordingsPage /></RoleRoute>} />

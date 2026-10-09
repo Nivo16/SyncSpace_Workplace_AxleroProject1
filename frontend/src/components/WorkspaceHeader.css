@@ -104,3 +104,22 @@
 .leave-btn:hover {
   background: rgba(239, 68, 68, 0.24);
 }
+
+[data-theme="light"] .workspace-header {
+  background: rgba(255, 255, 255, .96);
+  border-color: rgba(31, 73, 75, .13);
+  color: #203238;
+}
+
+[data-theme="light"] .brand-mark {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-theme="light"] .workspace-heading h2 { color: #203238; }
+[data-theme="light"] .room-id { color: #617274; border-color: #dce6e2; }
+[data-theme="light"] .connection-status { color: #21806f; }
+[data-theme="light"] .avatar { border-color: white; background: #e4f2ee; color: #176a63; }
+[data-theme="light"] .leave-btn { background: #fff4f0; border-color: #f0c8ba; color: #a4442d; }
+[data-theme="light"] .leave-btn:hover { background: #ffebe4; }

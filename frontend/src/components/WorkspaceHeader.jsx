@@ -22,7 +22,7 @@ function WorkspaceHeader({ roomId, workspaceName, workspaceType, inviteCode, col
   return (
     <header className="workspace-header">
       <div className="header-left">
-        <div className="brand-mark">S</div>
+        <span className="syncspace-mark-crop brand-mark"><img src="/SyncSpace%20Logo.png" alt="SyncSpace" /></span>
         <div className="workspace-heading">
           <h2>{workspaceName || "SyncSpace"}</h2>
           <span>{workspaceType}</span>

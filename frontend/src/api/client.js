@@ -7,6 +7,19 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const TOKEN_KEY = 'syncspace-token';
 export const getToken = () => window.localStorage.getItem(TOKEN_KEY) || '';
 
+// Guests (share-link visitors) keep a separate, workspace-scoped token so /auth/me never sees it.
+const GUEST_KEY = 'syncspace-guest';
+export const getGuestSession = () => {
+    try {
+        return JSON.parse(window.localStorage.getItem(GUEST_KEY) || 'null');
+    } catch {
+        return null;
+    }
+};
+export const saveGuestSession = (session) => window.localStorage.setItem(GUEST_KEY, JSON.stringify(session));
+export const clearGuestSession = () => window.localStorage.removeItem(GUEST_KEY);
+export const getAccessToken = () => getToken() || getGuestSession()?.token || '';
+
 class ApiError extends Error {
     constructor(message, status) {
         super(message);
@@ -15,7 +28,7 @@ class ApiError extends Error {
 }
 
 const authRequest = async (path, options = {}) => {
-    const token = getToken();
+    const token = getAccessToken();
     const response = await fetch(`${AUTH_API_URL}${path}`, {
         ...options,
         headers: {
@@ -48,6 +61,7 @@ const request = async (path, options) => {
 
 export const authApi = {
     login: (email, password) => authRequest('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    googleLogin: (credential) => authRequest('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
     signup: (name, email, password, role) => authRequest('/auth/signup', { method: 'POST', body: JSON.stringify({ name, email, password, role }) }),
     me: () => authRequest('/auth/me'),
     updateProfile: (payload) => authRequest('/auth/me', { method: 'PATCH', body: JSON.stringify(payload) }),
@@ -74,6 +88,7 @@ export const workspaceApi = {
     findByCode: (code) => authRequest(`/workspaces/code/${encodeURIComponent(code)}`),
     create: (payload) => authRequest('/workspaces', { method: 'POST', body: JSON.stringify(payload) }),
     join: (code) => authRequest(`/workspaces/${encodeURIComponent(code)}/join`, { method: 'POST' }),
+    joinAsGuest: (code, name) => authRequest(`/workspaces/${encodeURIComponent(code)}/guest`, { method: 'POST', body: JSON.stringify({ name }) }),
     updateMember: (id, memberId, role) => authRequest(`/workspaces/${id}/members/${encodeURIComponent(memberId)}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
     removeMember: (id, memberId) => authRequest(`/workspaces/${id}/members/${encodeURIComponent(memberId)}`, { method: 'DELETE' }),
     update: (id, payload) => authRequest(`/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),

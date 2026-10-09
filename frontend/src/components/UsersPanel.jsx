@@ -1,25 +1,29 @@
-import { useAuth } from "../context/AuthContext";
 import "./UsersPanel.css";
 
-function UsersPanel({ workspace, canManage, onRoleChange, onRemoveUser }) {
-  const { user: currentUser } = useAuth();
+function UsersPanel({ workspace, canManage, onRoleChange, onRemoveUser, presence = [], selfId }) {
   const storedUsers = workspace.collaboratorList || [];
   const hasCreator = storedUsers.some((user) => String(user.id) === String(workspace.owner));
-  const users = hasCreator || !workspace.ownerName
+  const members = hasCreator || !workspace.ownerName
     ? storedUsers
     : [{ id: workspace.owner, name: workspace.ownerName, role: "owner" }, ...storedUsers];
+  const onlineIds = new Set(presence.map((participant) => String(participant.id)));
+  const guests = presence.filter((participant) => participant.guest).map((participant) => ({ id: participant.id, name: participant.name || "Guest", role: "guest" }));
+  const users = [...members, ...guests];
+  const onlineCount = users.filter((user) => onlineIds.has(String(user.id))).length;
 
   return (
     <div className="users-panel">
       <div className="users-header">
         <h2>Users</h2>
-        <span>{users.length} collaborators</span>
+        <span>{onlineCount} online · {users.length} total</span>
       </div>
 
       <div className="users-list">
         {users.map((workspaceUser) => {
           const isCreator = String(workspaceUser.id) === String(workspace.owner);
           const isOwner = workspaceUser.role?.toLowerCase() === "owner";
+          const isGuest = workspaceUser.role === "guest";
+          const isOnline = onlineIds.has(String(workspaceUser.id));
           return (
             <div className="user-card" key={workspaceUser.id}>
             <div className="user-avatar">
@@ -38,16 +42,16 @@ function UsersPanel({ workspace, canManage, onRoleChange, onRemoveUser }) {
               </div>
 
               <div className="user-role">
-                {isCreator ? "Creator" : isOwner ? "Owner" : "Member"}
+                {isCreator ? "Creator" : isOwner ? "Owner" : isGuest ? "Guest" : "Member"}
               </div>
             </div>
 
-            <div className="user-status online">
+            <div className={`user-status ${isOnline ? "online" : "offline"}`}>
               <span className="status-dot"></span>
 
-              {String(workspaceUser.id) === String(currentUser?.id || currentUser?._id) ? "You" : "Member"}
+              {isOnline ? "Online" : "Offline"}{String(workspaceUser.id) === String(selfId) ? " · You" : ""}
             </div>
-            {canManage && !isCreator && (
+            {canManage && !isCreator && !isGuest && (
               <div className="member-actions">
                 <select
                   aria-label={`Role for ${workspaceUser.name}`}

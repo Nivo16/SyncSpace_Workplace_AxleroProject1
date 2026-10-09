@@ -48,8 +48,7 @@ function Register() {
     <div className="register-page">
       <div className="register-container">
         <div className="register-brand">
-          <div className="register-logo">S</div>
-          <h1>SyncSpace</h1>
+          <img className="register-logo" src="/SyncSpace%20Logo.png" alt="SyncSpace" />
           <p>Collaborate. Create. Connect.</p>
         </div>
 

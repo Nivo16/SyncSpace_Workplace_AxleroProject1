@@ -10,7 +10,7 @@ import HistoryPanel from '../components/HistoryTemp';
 import SettingsPanel from '../components/SettingsPanel';
 import { getWorkspaceHistory, getWorkspacePreferences, getWorkspaceStore, saveWorkspaceHistory, saveWorkspacePreferences } from '../data/workspaceStore';
 import { isInterviewWorkspace } from '../types/workspace';
-import { workspaceApi } from '../api/client';
+import { workspaceApi, getAccessToken, getGuestSession } from '../api/client';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import './Workspace.css';
@@ -29,28 +29,33 @@ export const WorkspacePage = () => {
   const [activeTab, setActiveTab] = useState('workspace');
   const [splitRatio, setSplitRatio] = useState(() => getWorkspacePreferences(workspaceId).splitRatio);
   const [historyEntries, setHistoryEntries] = useState(() => getWorkspaceHistory(workspaceId));
+  const [presence, setPresence] = useState([]);
   const currentUserId = user?.id || user?._id;
+  const guestSession = user ? null : getGuestSession();
+  const isGuest = Boolean(guestSession);
+  const selfId = currentUserId || guestSession?.guestId;
+  const homePath = isGuest ? '/' : '/dashboard';
 
   useEffect(() => {
     let cancelled = false;
     if (!MONGO_ID_RE.test(String(id))) { setLoading(false); return undefined; }
-    workspaceApi.get(id).then(({ workspace }) => { if (!cancelled) setCurrentWorkspace(workspace); }).catch((err) => { showToast(err.message || 'Could not load workspace', 'error'); navigate('/dashboard'); }).finally(() => { if (!cancelled) setLoading(false); });
+    workspaceApi.get(id).then(({ workspace }) => { if (!cancelled) setCurrentWorkspace(workspace); }).catch((err) => { showToast(err.message || 'Could not load workspace', 'error'); navigate(homePath); }).finally(() => { if (!cancelled) setLoading(false); });
     workspaceApi.getActivity(id).then(({ entries }) => { if (!cancelled) setHistoryEntries(entries || []); }).catch((err) => showToast(err.message || 'Could not load workspace history', 'error'));
-    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000', { auth: { token: localStorage.getItem('syncspace-token') || '' } });
+    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000', { auth: { token: getAccessToken() } });
     socket.on('connect', () => socket.emit('join-workspace', id));
     socket.on('workspace:access-denied', () => {
       if (cancelled) return;
       showToast('You no longer have access to this workspace', 'error');
-      navigate('/dashboard');
+      navigate(homePath);
     });
     socket.on('workspace:updated', (workspace) => {
       if (cancelled) return;
-      const stillMember = role === 'admin' || String(workspace.owner) === String(currentUserId) ||
+      const stillMember = isGuest || role === 'admin' || String(workspace.owner) === String(currentUserId) ||
         (workspace.collaboratorList || []).some((member) => String(member.id) === String(currentUserId));
       if (!stillMember) {
         socket.emit('leave-workspace', id);
         showToast('You no longer have access to this workspace', 'error');
-        navigate('/dashboard');
+        navigate(homePath);
         return;
       }
       setCurrentWorkspace(workspace);
@@ -58,6 +63,7 @@ export const WorkspacePage = () => {
     socket.on('workspace:activity', (entry) => {
       if (!cancelled) setHistoryEntries((entries) => [entry, ...entries.filter((item) => item._id !== entry._id)]);
     });
+    socket.on('workspace:presence', (participants) => { if (!cancelled) setPresence(participants); });
     socket.on('workspace:file-updated', (file) => {
       if (!cancelled) window.dispatchEvent(new CustomEvent('syncspace:file-updated', { detail: file }));
     });
@@ -65,7 +71,7 @@ export const WorkspacePage = () => {
       if (!cancelled) window.dispatchEvent(new CustomEvent('syncspace:file-deleted', { detail: payload }));
     });
     return () => { cancelled = true; socket.disconnect(); };
-  }, [id, currentUserId, role, navigate, showToast]);
+  }, [id, currentUserId, role, isGuest, navigate, showToast]);
 
   const workspaceType = currentWorkspace.type || 'Code + Whiteboard';
   const hasWhiteboard = workspaceType !== 'Code Editor';
@@ -112,11 +118,11 @@ export const WorkspacePage = () => {
   if (loading) return <div className="min-h-screen bg-slate-950 text-slate-400 flex items-center justify-center">Loading workspace…</div>;
 
   return <div className="workspace" data-active-tab={safeActiveTab}>
-    <WorkspaceHeader roomId={currentWorkspace.roomId || id} inviteCode={currentWorkspace.inviteCode || currentWorkspace.code} collaborators={currentWorkspace.collaboratorList || []} workspaceName={currentWorkspace.name} workspaceType={workspaceType} onLeave={() => navigate('/dashboard')} />
+    <WorkspaceHeader roomId={currentWorkspace.roomId || id} inviteCode={currentWorkspace.inviteCode || currentWorkspace.code} collaborators={currentWorkspace.collaboratorList || []} workspaceName={currentWorkspace.name} workspaceType={workspaceType} onLeave={() => navigate(homePath)} />
     <div className="workspace-body">
       <WorkspaceSidebar activeTab={safeActiveTab} setActiveTab={setActiveTab} visibleTabs={visibleTabs} />
       <main className={`workspace-main ${showingManagement ? 'workspace-main-single' : ''}`} style={{ gridTemplateColumns: showingManagement || !hasBothTools ? '1fr' : `${splitRatio}fr ${100 - splitRatio}fr` }}>
-        {safeActiveTab === 'users' && <UsersPanel workspace={currentWorkspace} canManage={canManage} onRoleChange={handleMemberRoleChange} onRemoveUser={handleRemoveMember} />}
+        {safeActiveTab === 'users' && <UsersPanel workspace={currentWorkspace} canManage={canManage} presence={presence} selfId={selfId} onRoleChange={handleMemberRoleChange} onRemoveUser={handleRemoveMember} />}
         {safeActiveTab === 'history' && <HistoryPanel entries={historyEntries} />}
         {safeActiveTab === 'settings' && <SettingsPanel splitRatio={splitRatio} hasBothTools={hasBothTools} onSplitRatioChange={(v) => { setSplitRatio(v); saveWorkspacePreferences(workspaceId, { splitRatio: v }); }} onDownload={handleDownload} />}
         {!showingManagement && safeActiveTab === 'workspace' && hasWhiteboard && <section className="whiteboard-panel"><div className="panel-title">Whiteboard <span>Visual workspace</span></div><Whiteboard workspaceId={workspaceId} roomId={currentWorkspace.roomId || workspaceId} onActivity={recordActivity} /></section>}

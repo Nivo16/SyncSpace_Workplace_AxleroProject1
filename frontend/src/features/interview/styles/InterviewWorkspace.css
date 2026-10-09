@@ -11,6 +11,25 @@
   overflow: hidden;
 }
 
+[data-theme="light"] .interview-workspace {
+  background: #f3f7f5;
+  color: #203238;
+}
+[data-theme="light"] .interview-header { background: #fff; border-color: #dce6e2; }
+[data-theme="light"] .interview-header-title-block h1,
+[data-theme="light"] .interview-people strong { color: #203238; }
+[data-theme="light"] .interview-kicker { color: #148b82; }
+[data-theme="light"] .interview-back-btn { background: #fff; color: #405355; border-color: #d8e2de; }
+[data-theme="light"] .interview-back-btn:hover { color: #126f6a; border-color: #a9d3ca; }
+[data-theme="light"] .interview-people,
+[data-theme="light"] .interview-question-count { color: #687a7b; }
+[data-theme="light"] .interview-status-badge { color: #526668; border-color: #d4e0dc; }
+[data-theme="light"] .interview-status-active { color: #137f78; background: #e8f5f1; border-color: #b9ddd2; }
+[data-theme="light"] .interview-live-dot { background: #1ca38e; }
+[data-theme="light"] .interview-sidebar { background: #eef4f1; border-color: #dce6e2; }
+[data-theme="light"] .interview-panel-card,
+[data-theme="light"] .interview-notes-wrap { background: #fff; border-color: #dce6e2; }
+
 .interview-header {
   display: flex;
   align-items: center;

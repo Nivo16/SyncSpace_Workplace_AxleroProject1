@@ -15,6 +15,26 @@
   padding: 40px 20px;
 }
 
+[data-theme="light"] .register-page {
+  background: radial-gradient(ellipse at top right, rgba(231, 102, 67, .08), transparent 40%), #f3f7f5;
+}
+[data-theme="light"] .register-button { background: linear-gradient(120deg, #148b82, #16776f); }
+[data-theme="light"] .register-button:hover { box-shadow: 0 8px 22px rgba(20, 139, 130, .2); }
+[data-theme="light"] .login-link a { color: #147f77; }
+[data-theme="light"] .register-logo { display: block; width: 190px; height: 148px; margin: 0 auto 11px; background: transparent; box-shadow: none; object-fit: contain; }
+[data-theme="light"] .register-brand h1,
+[data-theme="light"] .register-card h2 { color: #203238; }
+[data-theme="light"] .register-brand p,
+[data-theme="light"] .register-subtitle { color: #687a7b; }
+[data-theme="light"] .register-card { background: white; border-color: #dce6e2; box-shadow: 0 18px 48px rgba(31, 63, 60, .09); }
+[data-theme="light"] .register-input-group label { color: #405355; }
+[data-theme="light"] .register-input-group input,
+[data-theme="light"] .register-input-group select { background: #f8faf9; border-color: #d7e2de; color: #203238; }
+[data-theme="light"] .register-input-group input:focus,
+[data-theme="light"] .register-input-group select:focus { border-color: #71b9ae; box-shadow: 0 0 0 3px rgba(20, 139, 130, .11); }
+[data-theme="light"] .register-footer { color: #81908f; }
+[data-theme="light"] .password-toggle { color: #627371; }
+
 
 /* ================================
    MAIN CONTAINER

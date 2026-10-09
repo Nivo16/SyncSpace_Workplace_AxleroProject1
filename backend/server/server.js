@@ -97,6 +97,23 @@ ysocketio.on("document-update", (doc) => {
 
 const rooms = new Map();
 
+// workspaceId -> Map(socketId -> { id, guest, name }); drives the online/offline dots.
+const workspacePresence = new Map();
+
+function broadcastPresence(workspaceId) {
+  const unique = new Map();
+  workspacePresence.get(workspaceId)?.forEach((participant) => unique.set(participant.id, participant));
+  io.to(`workspace:${workspaceId}`).emit("workspace:presence", [...unique.values()]);
+}
+
+function removePresence(socket, workspaceId) {
+  const sockets = workspacePresence.get(workspaceId);
+  if (!sockets?.delete(socket.id)) return;
+  if (!sockets.size) workspacePresence.delete(workspaceId);
+  socket.data.presenceRooms?.delete(workspaceId);
+  broadcastPresence(workspaceId);
+}
+
 // Attach the authenticated user (if any) to the socket. Sockets used for
 // public/anonymous flows (e.g. pre-join mic test) are still allowed to
 // connect without a token; but any identity-bearing signaling (e.g. who is
@@ -106,7 +123,12 @@ io.use((socket, next) => {
   if (token) {
     try {
       const payload = jwt.verify(token, process.env.JWT_SECRET);
-      socket.data.user = { userId: payload.userId, email: payload.email, role: payload.role };
+      socket.data.user = {
+        userId: payload.userId,
+        email: payload.email,
+        role: payload.role,
+        ...(payload.guest ? { guest: true, name: payload.name, workspaceId: payload.workspaceId } : {}),
+      };
     } catch (err) {
       // invalid token: proceed unauthenticated rather than hard-failing the socket,
       // since some rooms (whiteboard demo/test pages) don't require auth
@@ -128,13 +150,18 @@ io.on("connection", (socket) => {
       return;
     }
     try {
-      const workspace = await Workspace.findById(workspaceId).select("owner collaborators.user");
-      const isMember = workspace && (
-        String(workspace.owner) === String(user.userId) ||
-        workspace.collaborators.some((member) => String(member.user) === String(user.userId)) ||
-        user.role === "admin"
-      );
-      if (!isMember) {
+      let allowed;
+      if (user.guest) {
+        allowed = String(workspaceId) === String(user.workspaceId);
+      } else {
+        const workspace = await Workspace.findById(workspaceId).select("owner collaborators.user");
+        allowed = Boolean(workspace) && (
+          String(workspace.owner) === String(user.userId) ||
+          workspace.collaborators.some((member) => String(member.user) === String(user.userId)) ||
+          user.role === "admin"
+        );
+      }
+      if (!allowed) {
         socket.emit("workspace:access-denied", { workspaceId });
         return;
       }
@@ -143,10 +170,19 @@ io.on("connection", (socket) => {
       return;
     }
     socket.join(`workspace:${workspaceId}`);
+
+    const key = String(workspaceId);
+    if (!workspacePresence.has(key)) workspacePresence.set(key, new Map());
+    workspacePresence.get(key).set(socket.id, { id: String(user.userId), guest: Boolean(user.guest), name: user.guest ? user.name : undefined });
+    if (!socket.data.presenceRooms) socket.data.presenceRooms = new Set();
+    socket.data.presenceRooms.add(key);
+    broadcastPresence(key);
   });
 
   socket.on("leave-workspace", (workspaceId) => {
-    if (workspaceId) socket.leave(`workspace:${workspaceId}`);
+    if (!workspaceId) return;
+    socket.leave(`workspace:${workspaceId}`);
+    removePresence(socket, String(workspaceId));
   });
 
   socket.on("join-room", (roomId) => {
@@ -215,6 +251,7 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.id}`);
+    socket.data.presenceRooms?.forEach((workspaceId) => removePresence(socket, workspaceId));
     cleanupSocket(socket);
   });
 });

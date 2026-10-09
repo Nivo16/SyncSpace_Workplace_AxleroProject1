@@ -54,6 +54,13 @@ export function AuthProvider({ children }) {
     return data.user;
   }, [applySession]);
 
+  const loginWithGoogle = useCallback(async (credential) => {
+    const data = await authApi.googleLogin(credential);
+    window.localStorage.setItem('syncspace-authenticated', 'true');
+    applySession(data.token, data.user);
+    return data.user;
+  }, [applySession]);
+
   const register = useCallback(async (name, email, password, role) => {
     const data = await authApi.signup(name, email, password, role);
     window.localStorage.setItem('syncspace-authenticated', 'true');
@@ -72,8 +79,8 @@ export function AuthProvider({ children }) {
   }, [clearSession]);
 
   const value = useMemo(
-    () => ({ user, role: user?.role || null, status, isAuthenticated: status === 'authenticated', login, register, updateProfile, logout }),
-    [user, status, login, register, updateProfile, logout]
+    () => ({ user, role: user?.role || null, status, isAuthenticated: status === 'authenticated', login, loginWithGoogle, register, updateProfile, logout }),
+    [user, status, login, loginWithGoogle, register, updateProfile, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

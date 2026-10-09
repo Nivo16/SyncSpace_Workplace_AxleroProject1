@@ -1,7 +1,8 @@
 const express = require('express');
 const Workspace = require('../models/Workspace');
 const WorkspaceFile = require('../models/WorkspaceFile');
-const { requireAuth } = require('../middleware/auth');
+// Every route here is workspace-scoped, so guest tokens are accepted (checked in getWorkspace).
+const { requireAuthOrGuest: requireAuth } = require('../middleware/auth');
 const { writeAudit, broadcastWorkspaceActivity } = require('../utils/audit');
 
 const router = express.Router({ mergeParams: true });
@@ -9,8 +10,10 @@ const router = express.Router({ mergeParams: true });
 async function getWorkspace(req, res) {
   const ws = await Workspace.findById(req.params.workspaceId);
   if (!ws) { res.status(404).json({ message: 'Workspace not found' }); return null; }
-  const allowed = String(ws.owner) === String(req.user.userId) ||
-    ws.collaborators.some((c) => String(c.user) === String(req.user.userId)) || req.user.role === 'admin';
+  const allowed = req.user.guest
+    ? String(ws._id) === String(req.user.workspaceId)
+    : String(ws.owner) === String(req.user.userId) ||
+      ws.collaborators.some((c) => String(c.user) === String(req.user.userId)) || req.user.role === 'admin';
   if (!allowed) { res.status(403).json({ message: 'You do not have access to this workspace' }); return null; }
   return ws;
 }

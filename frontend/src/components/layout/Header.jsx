@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Bell, Search, LogIn, UserPlus, LogOut, Zap, Moon, Sun } from 'lucide-react';
+import { Menu, Bell, Search, LogIn, UserPlus, LogOut, Moon, Sun } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -28,29 +28,28 @@ export const Header = ({ title = 'Dashboard', onMenuClick, searchQuery = '', set
   const isLightMode = theme === 'light';
 
   return (
-    <header className="h-16 border-b border-cyan-500/20 bg-slate-950/80 backdrop-blur-xl px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30">
+    <header className="app-topbar h-16 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30">
       <div className="flex items-center gap-3">
-        <button onClick={onMenuClick} className="lg:hidden text-slate-400 hover:text-cyan-300 p-2 rounded-xl hover:bg-slate-900 border border-slate-800" aria-label="Open sidebar menu">
+        <button onClick={onMenuClick} className="app-icon-button lg:hidden p-2 rounded-lg" aria-label="Open sidebar menu">
           <Menu className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-lg sm:text-xl font-bold text-slate-100 tracking-tight flex items-center gap-2">
+          <h1 className="page-title text-lg sm:text-xl font-bold tracking-tight">
             <span>{title}</span>
-            <Zap className="w-4 h-4 text-cyan-400" />
           </h1>
         </div>
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
         {setSearchQuery && (
-          <div className="relative hidden md:block w-64 lg:w-72">
-            <Search className="w-4 h-4 text-cyan-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <div className="header-search-wrap relative hidden md:block w-64 lg:w-72">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               placeholder="Search workspaces..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-8 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 transition-all"
+              className="header-search w-full border rounded-lg pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-2 transition-all"
             />
             <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">⌘K</span>
           </div>
@@ -62,7 +61,7 @@ export const Header = ({ title = 'Dashboard', onMenuClick, searchQuery = '', set
             setTheme(isLightMode ? 'cyan' : 'light');
             showToast(isLightMode ? 'Dark mode enabled' : 'Light mode enabled', 'info');
           }}
-          className="p-2 rounded-xl border border-slate-800/80 text-slate-400 hover:text-cyan-300 hover:bg-slate-900 transition-colors"
+          className="app-icon-button p-2 rounded-lg transition-colors"
           aria-label={isLightMode ? 'Switch to dark mode' : 'Switch to light mode'}
           title={isLightMode ? 'Switch to dark mode' : 'Switch to light mode'}
         >
@@ -72,15 +71,15 @@ export const Header = ({ title = 'Dashboard', onMenuClick, searchQuery = '', set
         <div className="relative">
           <button
             onClick={() => setNotifOpen(!notifOpen)}
-            className="p-2 rounded-xl text-slate-400 hover:text-cyan-300 hover:bg-slate-900 border border-slate-800/80 transition-colors relative cursor-pointer"
+            className="app-icon-button p-2 rounded-lg border transition-colors relative cursor-pointer"
             aria-label="Notifications"
           >
             <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-cyan-400 ring-2 ring-slate-950 animate-ping" />
+            <span className="notification-dot absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2" />
           </button>
           {notifOpen && (
-            <div className="absolute right-0 mt-2 w-80 bg-slate-950 border border-cyan-500/30 rounded-2xl shadow-2xl shadow-cyan-950 p-4 z-50 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+            <div className="notification-popover absolute right-0 mt-2 w-80 rounded-xl border p-4 z-50 animate-in fade-in duration-150">
+              <div className="notification-heading flex items-center justify-between pb-3 border-b mb-3">
                 <span className="font-semibold text-sm text-slate-200">Notifications</span>
                 <span className="text-xs text-cyan-400 font-medium cursor-pointer hover:underline" onClick={() => showToast('All marked as read', 'info')}>Mark all read</span>
               </div>
@@ -101,15 +100,15 @@ export const Header = ({ title = 'Dashboard', onMenuClick, searchQuery = '', set
 
         <div className="flex items-center gap-2">
           {isAuthenticated ? (
-            <Button variant="outline" size="sm" icon={<LogOut className="w-4 h-4 text-cyan-400" />} onClick={handleLogout}>
+            <Button className="header-auth-button" variant="outline" size="sm" icon={<LogOut className="w-4 h-4 text-cyan-400" />} onClick={handleLogout}>
               Logout
             </Button>
           ) : (
             <>
-              <Button variant="outline" size="sm" icon={<LogIn className="w-4 h-4 text-cyan-400" />} onClick={() => navigate('/login')}>
+              <Button className="header-auth-button" variant="outline" size="sm" icon={<LogIn className="w-4 h-4 text-cyan-400" />} onClick={() => navigate('/login')}>
                 Login
               </Button>
-              <Button variant="thunder" size="sm" icon={<UserPlus className="w-4 h-4" />} onClick={() => navigate('/register')} className="hidden sm:inline-flex">
+              <Button variant="thunder" size="sm" icon={<UserPlus className="w-4 h-4" />} onClick={() => navigate('/register')} className="header-auth-button hidden sm:inline-flex">
                 Register
               </Button>
             </>

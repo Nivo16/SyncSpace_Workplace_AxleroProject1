@@ -1,6 +1,8 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const { OAuth2Client } = require("google-auth-library");
 const User = require("../models/User");
 const { writeAudit } = require("../utils/audit");
 
@@ -78,6 +80,56 @@ router.post("/login", async (req, res) => {
   } catch (err) {
     console.error("Login error:", err.message);
     res.status(500).json({ message: "Server error during login" });
+  }
+});
+
+router.post("/google", async (req, res) => {
+  try {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const credential = String(req.body.credential || "");
+    if (!clientId) return res.status(503).json({ message: "Google sign-in is not configured" });
+    if (!credential) return res.status(400).json({ message: "Google credential is required" });
+
+    const ticket = await new OAuth2Client(clientId).verifyIdToken({ idToken: credential, audience: clientId });
+    const profile = ticket.getPayload();
+    if (!profile?.sub || !profile.email || profile.email_verified !== true) {
+      return res.status(401).json({ message: "Google account could not be verified" });
+    }
+
+    const email = profile.email.toLowerCase();
+    let user = await User.findOne({ $or: [{ googleId: profile.sub }, { email }] });
+    if (user?.googleId && user.googleId !== profile.sub) {
+      return res.status(409).json({ message: "This email is linked to a different Google account" });
+    }
+    if (!user) {
+      const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
+      user = await User.create({
+        name: String(profile.name || email.split("@")[0]).trim(),
+        email,
+        password: randomPassword,
+        googleId: profile.sub,
+        avatarUrl: profile.picture || "",
+        role: "user",
+      });
+    } else {
+      user.googleId = profile.sub;
+      if (!user.avatarUrl && profile.picture) user.avatarUrl = profile.picture;
+      await user.save();
+    }
+
+    const token = jwt.sign(
+      { userId: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+    await writeAudit({ user: { userId: user._id, email: user.email, role: user.role } }, "auth.google_login", "user", user._id, { email: user.email });
+    res.json({
+      token,
+      user: { id: user._id, name: user.name, email: user.email, role: user.role, phone: user.phone || "", bio: user.bio || "", avatarUrl: user.avatarUrl || "" },
+    });
+  } catch (err) {
+    console.error("Google login error:", err.message);
+    res.status(401).json({ message: "Google sign-in could not be verified" });
   }
 });
 

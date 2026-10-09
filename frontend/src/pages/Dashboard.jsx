@@ -102,14 +102,14 @@ export const Dashboard = ({ readOnly = false }) => {
 
   const dashboardStats = [
     { id: 'active-workspaces', label: 'Active Workspaces', value: activeWorkspaces, change: `${workspaces.length} total`, changeType: 'positive', iconName: 'FolderKanban' },
-    { id: 'collaborators', label: 'Collaborators', value: collaboratorTotal, change: 'From live workspace data', changeType: 'positive', iconName: 'Users' },
+    { id: 'collaborators', label: 'Collaborators', value: collaboratorTotal, change: 'Live workspaces', changeType: 'positive', iconName: 'Users' },
     { id: 'interviews', label: 'Interviews', value: interviews.length, change: `${activeInterviews} active now`, changeType: 'neutral', iconName: 'Clock' },
     { id: 'active-now', label: 'Active Now', value: activeInterviews, change: activeInterviews ? 'Live interviews' : 'No active interviews', changeType: activeInterviews ? 'positive' : 'neutral', iconName: 'Zap' },
   ];
 
   return (
     <DashboardLayout title="Dashboard" searchQuery={searchQuery} setSearchQuery={setSearchQuery}>
-      <WelcomeSection onCreateWorkspace={() => setCreateModalOpen(true)} onJoinWorkspace={() => setJoinModalOpen(true)} readOnly={readOnly} />
+      <WelcomeSection onCreateWorkspace={() => setCreateModalOpen(true)} onJoinWorkspace={() => setJoinModalOpen(true)} readOnly={readOnly} showLaptop={!isAuthenticated} />
       {loading ? (
         <div className="py-12 text-center text-sm text-slate-500">Loading live workspace data…</div>
       ) : (

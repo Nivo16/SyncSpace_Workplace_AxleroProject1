@@ -1,14 +1,16 @@
 const express = require("express");
+const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
 const Workspace = require("../models/Workspace");
 const WorkspaceFile = require("../models/WorkspaceFile");
 const YjsDocument = require("../models/YjsDocument");
 const AuditLog = require("../models/AuditLog");
-const { requireAuth } = require("../middleware/auth");
+const { requireAuth, requireAuthOrGuest } = require("../middleware/auth");
 const { writeAudit, broadcastWorkspaceActivity } = require("../utils/audit");
 
 const router = express.Router();
 
-function serialize(ws) {
+function serialize(ws, { hideEmails = false } = {}) {
   return {
     id: String(ws._id),
     name: ws.name,
@@ -24,7 +26,7 @@ function serialize(ws) {
     collaboratorList: (ws.collaborators || []).map((c) => ({
       id: String(c.user?._id || c.user),
       name: c.user?.name || "Member",
-      email: c.user?.email || "",
+      email: hideEmails ? "" : c.user?.email || "",
       role: c.role,
     })),
     status: ws.status,
@@ -46,13 +48,18 @@ function canManage(ws, user) {
     );
 }
 
+function hasAccess(ws, user) {
+  if (user.guest) return String(ws._id) === String(user.workspaceId);
+  return user.role === "admin" || canAccess(ws, user.userId);
+}
+
 async function findAccessibleWorkspace(req, res) {
   const ws = await Workspace.findById(req.params.id);
   if (!ws) {
     res.status(404).json({ message: "Workspace not found" });
     return null;
   }
-  if (!canAccess(ws, req.user.userId) && req.user.role !== "admin") {
+  if (!hasAccess(ws, req.user)) {
     res.status(403).json({ message: "You do not have access to this workspace" });
     return null;
   }
@@ -81,7 +88,7 @@ router.post("/", requireAuth, async (req, res) => {
     const activity = await writeAudit(req, "workspace.created", "workspace", ws._id, { name: ws.name, inviteCode });
     await broadcastWorkspaceActivity(req, ws, activity);
     const io = req.app.get("io");
-    io?.to(`workspace:${ws._id}`).emit("workspace:updated", serialize(ws));
+    io?.to(`workspace:${ws._id}`).emit("workspace:updated", serialize(ws, { hideEmails: true }));
     res.status(201).json({ workspace: serialize(ws) });
   } catch (err) {
     console.error("Create workspace error:", err.message);
@@ -129,29 +136,62 @@ router.post("/:code/join", requireAuth, async (req, res) => {
     await ws.populate("owner", "name email");
     await ws.populate("collaborators.user", "name email");
     const workspace = serialize(ws);
-    req.app.get("io")?.to(`workspace:${ws._id}`).emit("workspace:updated", workspace);
+    req.app.get("io")?.to(`workspace:${ws._id}`).emit("workspace:updated", serialize(ws, { hideEmails: true }));
     res.json({ workspace });
   } catch (err) {
     res.status(500).json({ message: "Server error joining workspace" });
   }
 });
 
-router.get("/:id", requireAuth, async (req, res) => {
+const guestAttempts = new Map();
+function guestRateLimited(ip) {
+  const now = Date.now();
+  const recent = (guestAttempts.get(ip) || []).filter((time) => now - time < 10 * 60 * 1000);
+  recent.push(now);
+  guestAttempts.set(ip, recent);
+  return recent.length > 30;
+}
+
+// Public: anyone holding the share link can enter a general workspace as a named guest.
+router.post("/:code/guest", async (req, res) => {
+  try {
+    if (guestRateLimited(req.ip)) return res.status(429).json({ message: "Too many attempts. Try again later." });
+    const name = String(req.body.name || "").trim().replace(/\s+/g, " ").slice(0, 40);
+    if (!name) return res.status(400).json({ message: "Enter a name to continue as a guest" });
+    const ws = await Workspace.findOne({ inviteCode: String(req.params.code).toUpperCase() });
+    if (!ws || ws.kind === "interview") return res.status(404).json({ message: "Workspace not found" });
+    const guestId = `guest-${crypto.randomBytes(8).toString("hex")}`;
+    const token = jwt.sign(
+      { userId: guestId, role: "guest", guest: true, name, workspaceId: String(ws._id) },
+      process.env.JWT_SECRET,
+      { expiresIn: "12h" }
+    );
+    await ws.populate("owner", "name email");
+    await ws.populate("collaborators.user", "name email");
+    const activity = await writeAudit({ user: { userId: guestId, guest: true, name, role: "guest" } }, "workspace.guest_joined", "workspace", ws._id, { name });
+    await broadcastWorkspaceActivity(req, ws, activity);
+    res.json({ token, guest: { id: guestId, name, workspaceId: String(ws._id) }, workspace: serialize(ws, { hideEmails: true }) });
+  } catch (err) {
+    res.status(500).json({ message: "Server error joining as guest" });
+  }
+});
+
+router.get("/:id", requireAuthOrGuest, async (req, res) => {
   try {
     const ws = await Workspace.findById(req.params.id)
       .populate("owner", "name email")
       .populate("collaborators.user", "name email");
     if (!ws) return res.status(404).json({ message: "Workspace not found" });
-    if (!canAccess(ws, req.user.userId) && req.user.role !== "admin") {
+    if (!hasAccess(ws, req.user)) {
       return res.status(403).json({ message: "You do not have access to this workspace" });
     }
-    res.json({ workspace: serialize(ws) });
+    res.json({ workspace: serialize(ws, { hideEmails: Boolean(req.user.guest) }) });
   } catch (err) {
     res.status(500).json({ message: "Server error loading workspace" });
   }
 });
 
-router.get("/:id/activity", requireAuth, async (req, res) => {
+router.get("/:id/activity", requireAuthOrGuest, async (req, res) => {
   try {
     const ws = await findAccessibleWorkspace(req, res);
     if (!ws) return;
@@ -165,7 +205,7 @@ router.get("/:id/activity", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/:id/activity", requireAuth, async (req, res) => {
+router.post("/:id/activity", requireAuthOrGuest, async (req, res) => {
   try {
     const ws = await findAccessibleWorkspace(req, res);
     if (!ws) return;
@@ -205,7 +245,7 @@ router.patch("/:id/members/:memberId", requireAuth, async (req, res) => {
     await ws.populate("owner", "name email");
     await ws.populate("collaborators.user", "name email");
     const workspace = serialize(ws);
-    req.app.get("io")?.to(`workspace:${ws._id}`).emit("workspace:updated", workspace);
+    req.app.get("io")?.to(`workspace:${ws._id}`).emit("workspace:updated", serialize(ws, { hideEmails: true }));
     res.json({ workspace });
   } catch (err) {
     res.status(500).json({ message: "Server error updating workspace member" });
@@ -231,7 +271,7 @@ router.delete("/:id/members/:memberId", requireAuth, async (req, res) => {
     await ws.populate("owner", "name email");
     await ws.populate("collaborators.user", "name email");
     const workspace = serialize(ws);
-    req.app.get("io")?.to(`workspace:${ws._id}`).emit("workspace:updated", workspace);
+    req.app.get("io")?.to(`workspace:${ws._id}`).emit("workspace:updated", serialize(ws, { hideEmails: true }));
     res.json({ workspace });
   } catch (err) {
     res.status(500).json({ message: "Server error removing workspace member" });
@@ -255,7 +295,7 @@ router.patch("/:id", requireAuth, async (req, res) => {
     await ws.populate("owner", "name email");
     await ws.populate("collaborators.user", "name email");
     const io = req.app.get("io");
-    io?.to(`workspace:${ws._id}`).emit("workspace:updated", serialize(ws));
+    io?.to(`workspace:${ws._id}`).emit("workspace:updated", serialize(ws, { hideEmails: true }));
     res.json({ workspace: serialize(ws) });
   } catch (err) {
     res.status(500).json({ message: "Server error updating workspace" });

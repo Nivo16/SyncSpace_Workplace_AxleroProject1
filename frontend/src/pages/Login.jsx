@@ -2,18 +2,33 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { GoogleSignInButton } from "../components/auth/GoogleSignInButton";
 import "./Login.css";
 
 const ROLE_HOME = { admin: "/admin", interviewer: "/interviews", user: "/dashboard" };
 
 function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  const handleGoogleCredential = async (credential) => {
+    setError("");
+    setLoading(true);
+    try {
+      const user = await loginWithGoogle(credential);
+      const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+      navigate(returnTo || ROLE_HOME[user.role] || "/dashboard", { replace: true });
+    } catch (err) {
+      setError(err.message || "Google sign-in failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -44,8 +59,7 @@ function Login() {
     <div className="login-page">
       <div className="login-container">
         <div className="syncspace-brand">
-          <div className="syncspace-logo">S</div>
-          <h1>SyncSpace</h1>
+          <img className="syncspace-logo" src="/SyncSpace%20Logo.png" alt="SyncSpace" />
           <p>Collaborate. Create. Connect.</p>
         </div>
 
@@ -105,6 +119,13 @@ function Login() {
               {loading ? "Signing in…" : "Sign In"}
             </button>
           </form>
+
+          <div className="login-divider"><span>or</span></div>
+          <GoogleSignInButton
+            onCredential={handleGoogleCredential}
+            onSetupRequired={() => setError("Google sign-in needs a Google OAuth web Client ID. Add it to both frontend and backend environment files.")}
+            disabled={loading}
+          />
 
           <p className="register-link">
             Don't have an account? <Link to="/register">Create account</Link>

@@ -36,7 +36,7 @@ function Whiteboard({ workspaceId, roomId, onActivity }) {
 
   useEffect(() => {
     const ydoc = new Y.Doc();
-    const provider = new SocketIOProvider("http://localhost:5000", `whiteboard-${roomId || workspaceId || "default"}`, ydoc, { autoConnect: true });
+    const provider = new SocketIOProvider("http://localhost:5001", `whiteboard-${roomId || workspaceId || "default"}`, ydoc, { autoConnect: true });
     const yShapes = ydoc.getArray("shapes");
     ydocRef.current = ydoc;
     providerRef.current = provider;

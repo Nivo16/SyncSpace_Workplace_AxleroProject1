@@ -1,7 +1,7 @@
 // Base URL for the real Express/Mongo backend (auth, interviews, admin).
 // Distinct from API_BASE_URL below, which some legacy demo endpoints
 // (/state, /workspaces/*) point at a mock/local API layer.
-const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:5000/api';
+const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:5001/api';
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const TOKEN_KEY = 'syncspace-token';

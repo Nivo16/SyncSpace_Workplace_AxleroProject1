@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { GoogleSignInButton } from "../components/auth/GoogleSignInButton";
 import "./Login.css";
 
-const ROLE_HOME = { admin: "/admin", interviewer: "/interviews", user: "/dashboard" };
+const ROLE_HOME = { admin: "/dashboard", interviewer: "/dashboard", user: "/dashboard" };
 
 function Login() {
   const navigate = useNavigate();

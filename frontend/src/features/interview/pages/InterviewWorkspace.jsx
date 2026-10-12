@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { Code2, Palette, Share2, Copy, Check, Award } from 'lucide-react';
+import { ArrowLeft, Code2, Palette, Share2, Copy, Check, Award, GripVertical } from 'lucide-react';
 import { getWorkspaceStore, saveWorkspaceHistory } from '../../../data/workspaceStore';
 import { isInterviewWorkspace } from '../../../types/workspace';
 import { InterviewStatus } from '../types/interview.types';
@@ -35,6 +35,9 @@ export function InterviewWorkspacePage() {
   const [score, setScore] = useState('');
   const [scoreFeedback, setScoreFeedback] = useState('');
   const [savingScore, setSavingScore] = useState(false);
+  const [splitRatio, setSplitRatio] = useState(50);
+  const stageRef = useRef(null);
+  const resizingRef = useRef(false);
 
   const isBackendInterview = MONGO_ID_RE.test(String(id));
 
@@ -83,6 +86,20 @@ export function InterviewWorkspacePage() {
     saveWorkspaceHistory(workspaceId, { action, source });
   };
 
+  const updateSplitRatio = (clientX) => {
+    const bounds = stageRef.current?.getBoundingClientRect();
+    if (!bounds?.width) return;
+    setSplitRatio(Math.min(75, Math.max(25, ((clientX - bounds.left) / bounds.width) * 100)));
+  };
+
+  const handleSplitterKeyDown = (event) => {
+    if (event.key === 'ArrowLeft') setSplitRatio((ratio) => Math.max(25, ratio - 5));
+    else if (event.key === 'ArrowRight') setSplitRatio((ratio) => Math.min(75, ratio + 5));
+    else if (event.key === 'Home') setSplitRatio(25);
+    else if (event.key === 'End') setSplitRatio(75);
+    else return;
+    event.preventDefault();
+  };
   const saveScore = async () => {
     const numeric = Number(score);
     if (!Number.isFinite(numeric) || numeric < 0 || numeric > 100) { showToast('Score must be between 0 and 100', 'error'); return; }
@@ -109,7 +126,10 @@ export function InterviewWorkspacePage() {
   if (showSetup) {
     return (
       <div className="interview-workspace">
-        <div className="flex items-center justify-end gap-2 p-4 border-b border-slate-800 bg-slate-950">
+        <div className="flex items-center justify-between gap-2 p-4 border-b border-slate-800 bg-slate-950">
+          <Button variant="outline" size="sm" icon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate('/dashboard')}>
+            Dashboard
+          </Button>
           <Button variant="outline" size="sm" icon={<Share2 className="w-4 h-4" />} onClick={shareInterview}>
             {copied ? 'Copied' : 'Share Interview'}
           </Button>
@@ -208,11 +228,42 @@ export function InterviewWorkspacePage() {
             <button type="button" className={`interview-split-tab ${activeTool === 'split' ? 'active' : ''}`} onClick={() => setActiveTool('split')}>Split</button>
           </div>
 
-          <div className={`interview-stage interview-stage-${activeTool}`}>
+          <div
+            ref={stageRef}
+            className={`interview-stage interview-stage-${activeTool}`}
+            style={{
+              '--interview-split-left': `${splitRatio}fr`,
+              '--interview-split-right': `${100 - splitRatio}fr`,
+            }}
+          >
             <section className="interview-panel whiteboard-panel" data-panel="whiteboard">
               <div className="panel-title">Whiteboard <span>Shared canvas</span></div>
               <InterviewWhiteboard workspaceId={workspaceId} roomId={roomId} onActivity={recordActivity} />
             </section>
+            {activeTool === 'split' && (
+              <div
+                className="interview-resize-handle"
+                role="separator"
+                aria-label="Resize whiteboard and code editor panels"
+                aria-orientation="vertical"
+                aria-valuemin={25}
+                aria-valuemax={75}
+                aria-valuenow={Math.round(splitRatio)}
+                tabIndex={0}
+                onKeyDown={handleSplitterKeyDown}
+                onPointerDown={(event) => {
+                  resizingRef.current = true;
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }}
+                onPointerMove={(event) => {
+                  if (resizingRef.current) updateSplitRatio(event.clientX);
+                }}
+                onPointerUp={() => { resizingRef.current = false; }}
+                onLostPointerCapture={() => { resizingRef.current = false; }}
+              >
+                <GripVertical className="w-4 h-4" aria-hidden="true" />
+              </div>
+            )}
             <section className="interview-panel code-panel" data-panel="code">
               <div className="panel-title">Code Editor <span>Shared collaborative editor</span></div>
               <InterviewCodeEditor workspaceId={workspaceId} roomId={roomId} onActivity={recordActivity} />

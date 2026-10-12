@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, LogIn, Copy, Check, Loader2, AlertCircle, Video } from 'lucide-react';
+import { ArrowLeft, Plus, LogIn, Copy, Check, Loader2, AlertCircle, Video } from 'lucide-react';
 import { interviewsApi } from '../../../api/client';
 import { useAuth } from '../../../context/AuthContext';
 import { Button } from '../../../components/ui/Button';
@@ -71,6 +71,9 @@ export function InterviewsListPage() {
             </p>
           </div>
           <div className="flex gap-3">
+            <Button variant="outline" icon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate('/dashboard')}>
+              Dashboard
+            </Button>
             {canCreate && (
               <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={() => navigate('/interviews/create')}>
                 Create Interview

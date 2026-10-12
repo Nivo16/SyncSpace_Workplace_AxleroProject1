@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
+import { GripVertical } from 'lucide-react';
 import WorkspaceHeader from '../components/WorkspaceHeader';
 import WorkspaceSidebar from '../components/WorkspaceSidebar';
 import Whiteboard from '../components/Whiteboard';
@@ -28,6 +29,9 @@ export const WorkspacePage = () => {
   const workspaceId = id;
   const [activeTab, setActiveTab] = useState('workspace');
   const [splitRatio, setSplitRatio] = useState(() => getWorkspacePreferences(workspaceId).splitRatio);
+  const splitRatioRef = useRef(splitRatio);
+  const workspaceMainRef = useRef(null);
+  const resizingRef = useRef(false);
   const [historyEntries, setHistoryEntries] = useState(() => getWorkspaceHistory(workspaceId));
   const [presence, setPresence] = useState([]);
   const currentUserId = user?.id || user?._id;
@@ -41,7 +45,7 @@ export const WorkspacePage = () => {
     if (!MONGO_ID_RE.test(String(id))) { setLoading(false); return undefined; }
     workspaceApi.get(id).then(({ workspace }) => { if (!cancelled) setCurrentWorkspace(workspace); }).catch((err) => { showToast(err.message || 'Could not load workspace', 'error'); navigate(homePath); }).finally(() => { if (!cancelled) setLoading(false); });
     workspaceApi.getActivity(id).then(({ entries }) => { if (!cancelled) setHistoryEntries(entries || []); }).catch((err) => showToast(err.message || 'Could not load workspace history', 'error'));
-    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000', { auth: { token: getAccessToken() } });
+    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001', { auth: { token: getAccessToken() } });
     socket.on('connect', () => socket.emit('join-workspace', id));
     socket.on('workspace:access-denied', () => {
       if (cancelled) return;
@@ -113,6 +117,26 @@ export const WorkspacePage = () => {
   };
   const handleDownload = () => { const exportData = { workspace: currentWorkspace, document: getWorkspaceStore().documents[String(workspaceId)] || {}, history: historyEntries }; const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${currentWorkspace.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'workspace'}.json`; a.click(); URL.revokeObjectURL(url); recordActivity('Downloaded workspace project', 'workspace'); };
   const showingManagement = ['users', 'history', 'settings'].includes(safeActiveTab);
+  const canResizePanels = safeActiveTab === 'workspace' && !showingManagement && hasBothTools;
+  const resizePanelsTo = (ratio) => {
+    const boundedRatio = Math.min(75, Math.max(25, ratio));
+    splitRatioRef.current = boundedRatio;
+    setSplitRatio(boundedRatio);
+  };
+  const savePanelRatio = () => saveWorkspacePreferences(workspaceId, { splitRatio: Math.round(splitRatioRef.current) });
+  const handleSplitterKeyDown = (event) => {
+    if (event.key === 'ArrowLeft') resizePanelsTo(splitRatioRef.current - 5);
+    else if (event.key === 'ArrowRight') resizePanelsTo(splitRatioRef.current + 5);
+    else if (event.key === 'Home') resizePanelsTo(25);
+    else if (event.key === 'End') resizePanelsTo(75);
+    else return;
+    savePanelRatio();
+    event.preventDefault();
+  };
+  const updatePanelRatioFromPointer = (clientX) => {
+    const bounds = workspaceMainRef.current?.getBoundingClientRect();
+    if (bounds?.width) resizePanelsTo(((clientX - bounds.left) / bounds.width) * 100);
+  };
 
   if (localWorkspace && isInterviewWorkspace(localWorkspace)) return <Navigate to={`/interview/${id}`} replace />;
   if (loading) return <div className="min-h-screen bg-slate-950 text-slate-400 flex items-center justify-center">Loading workspace…</div>;
@@ -121,11 +145,42 @@ export const WorkspacePage = () => {
     <WorkspaceHeader roomId={currentWorkspace.roomId || id} inviteCode={currentWorkspace.inviteCode || currentWorkspace.code} collaborators={currentWorkspace.collaboratorList || []} workspaceName={currentWorkspace.name} workspaceType={workspaceType} onLeave={() => navigate(homePath)} />
     <div className="workspace-body">
       <WorkspaceSidebar activeTab={safeActiveTab} setActiveTab={setActiveTab} visibleTabs={visibleTabs} />
-      <main className={`workspace-main ${showingManagement ? 'workspace-main-single' : ''}`} style={{ gridTemplateColumns: showingManagement || !hasBothTools ? '1fr' : `${splitRatio}fr ${100 - splitRatio}fr` }}>
+      <main
+        ref={workspaceMainRef}
+        className={`workspace-main ${showingManagement ? 'workspace-main-single' : ''}`}
+        style={{ gridTemplateColumns: canResizePanels ? `minmax(0, ${splitRatio}fr) 8px minmax(0, ${100 - splitRatio}fr)` : '1fr' }}
+      >
         {safeActiveTab === 'users' && <UsersPanel workspace={currentWorkspace} canManage={canManage} presence={presence} selfId={selfId} onRoleChange={handleMemberRoleChange} onRemoveUser={handleRemoveMember} />}
         {safeActiveTab === 'history' && <HistoryPanel entries={historyEntries} />}
-        {safeActiveTab === 'settings' && <SettingsPanel splitRatio={splitRatio} hasBothTools={hasBothTools} onSplitRatioChange={(v) => { setSplitRatio(v); saveWorkspacePreferences(workspaceId, { splitRatio: v }); }} onDownload={handleDownload} />}
+        {safeActiveTab === 'settings' && <SettingsPanel splitRatio={splitRatio} hasBothTools={hasBothTools} onSplitRatioChange={(v) => { resizePanelsTo(v); saveWorkspacePreferences(workspaceId, { splitRatio: v }); }} onDownload={handleDownload} />}
         {!showingManagement && safeActiveTab === 'workspace' && hasWhiteboard && <section className="whiteboard-panel"><div className="panel-title">Whiteboard <span>Visual workspace</span></div><Whiteboard workspaceId={workspaceId} roomId={currentWorkspace.roomId || workspaceId} onActivity={recordActivity} /></section>}
+        {canResizePanels && (
+          <div
+            className="workspace-splitter"
+            role="separator"
+            aria-label="Resize whiteboard and code editor panels"
+            aria-orientation="vertical"
+            aria-valuemin={25}
+            aria-valuemax={75}
+            aria-valuenow={Math.round(splitRatio)}
+            tabIndex={0}
+            onKeyDown={handleSplitterKeyDown}
+            onPointerDown={(event) => {
+              resizingRef.current = true;
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              if (resizingRef.current) updatePanelRatioFromPointer(event.clientX);
+            }}
+            onPointerUp={() => {
+              resizingRef.current = false;
+              savePanelRatio();
+            }}
+            onLostPointerCapture={() => { resizingRef.current = false; }}
+          >
+            <GripVertical size={16} aria-hidden="true" />
+          </div>
+        )}
         {!showingManagement && safeActiveTab === 'workspace' && hasCodeEditor && <section className="code-panel"><div className="panel-title">Code Editor <span>Persistent project files</span></div><CodeEditor workspaceId={workspaceId} roomId={currentWorkspace.roomId || workspaceId} onActivity={recordActivity} /></section>}
         {!showingManagement && safeActiveTab === 'whiteboard' && hasWhiteboard && <section className="whiteboard-panel"><div className="panel-title">Whiteboard <span>Visual workspace</span></div><Whiteboard workspaceId={workspaceId} roomId={currentWorkspace.roomId || workspaceId} onActivity={recordActivity} /></section>}
         {!showingManagement && safeActiveTab === 'code' && hasCodeEditor && <section className="code-panel"><div className="panel-title">Code Editor <span>Persistent project files</span></div><CodeEditor workspaceId={workspaceId} roomId={currentWorkspace.roomId || workspaceId} onActivity={recordActivity} /></section>}

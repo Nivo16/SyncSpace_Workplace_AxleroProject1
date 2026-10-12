@@ -24,6 +24,25 @@
   background: rgba(34, 211, 238, 0.16);
 }
 
+.workspace-splitter {
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 8px;
+  color: #64748b;
+  background: #111c2e;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.workspace-splitter:hover,
+.workspace-splitter:focus-visible {
+  color: #67e8f9;
+  background: #173348;
+  outline: none;
+}
 .whiteboard-panel,
 .code-panel {
   flex: 1 1 0;
@@ -133,6 +152,9 @@
     gap: 1px;
   }
 
+  .workspace-splitter {
+    display: none;
+  }
   .whiteboard-panel,
   .code-panel {
     flex: 0 0 auto;
